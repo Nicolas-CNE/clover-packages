@@ -1,3 +1,0 @@
-NAME=bmon
-VERSION=latest
-URL=https://github.com/tgraf/bmon

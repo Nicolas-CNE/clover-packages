@@ -1,3 +1,0 @@
-NAME=cowsay
-VERSION=latest
-SOURCE_URL="https://github.com/takinami/cowsay/archive/refs/heads/master.tar.gz"

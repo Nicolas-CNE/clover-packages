@@ -1,4 +1,0 @@
-NAME="neofetch"
-REPO="https://github.com/dylanaraps/neofetch"
-BUILD_SYSTEM="make"
-DEPENDENCIES="gcc,make"

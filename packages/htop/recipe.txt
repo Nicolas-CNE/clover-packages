@@ -1,4 +1,0 @@
-NAME="htop"
-REPO="https://github.com/htop-dev/htop"
-BUILD_SYSTEM="script"
-DEPENDENCIES="gcc,make"

@@ -1,3 +1,0 @@
-NAME=diffutils
-VERSION=latest
-URL=https://github.com/bminor/diffutils

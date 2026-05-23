@@ -1,3 +1,0 @@
-NAME=tar
-VERSION=latest
-URL=https://github.com/bminor/tar

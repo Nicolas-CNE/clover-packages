@@ -1,3 +1,0 @@
-NAME=pv
-VERSION=latest
-URL=https://github.com/bminor/pv

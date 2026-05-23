@@ -1,4 +1,0 @@
-NAME="fetch"
-REPO="https://github.com/jschicht/fetch"
-BUILD_SYSTEM="make"
-DEPENDENCIES="gcc,make"

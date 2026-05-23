@@ -1,3 +1,0 @@
-NAME=nano
-VERSION=latest
-URL=https://github.com/bminor/nano

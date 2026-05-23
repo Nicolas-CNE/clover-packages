@@ -1,3 +1,0 @@
-NAME=gawk
-VERSION=latest
-URL=https://github.com/bminor/gawk
