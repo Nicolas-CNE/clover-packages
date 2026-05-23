@@ -1,0 +1,3 @@
+NAME=cowsay
+VERSION=latest
+URL=https://github.com/takinami/cowsay

@@ -1,0 +1,3 @@
+NAME=grep
+VERSION=latest
+URL=https://github.com/bminor/grep

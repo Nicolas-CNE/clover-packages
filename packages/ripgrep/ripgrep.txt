@@ -1,0 +1,3 @@
+NAME=ripgrep
+VERSION=latest
+URL=https://github.com/BurntSushi/ripgrep

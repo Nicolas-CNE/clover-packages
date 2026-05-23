@@ -1,0 +1,3 @@
+NAME=w3m
+VERSION=latest
+URL=https://github.com/tats/w3m

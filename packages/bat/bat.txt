@@ -1,0 +1,3 @@
+NAME=bat
+VERSION=latest
+URL=https://github.com/sharkdp/bat

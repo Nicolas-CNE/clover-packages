@@ -1,0 +1,3 @@
+NAME=micro
+VERSION=latest
+URL=https://github.com/zyedidia/micro

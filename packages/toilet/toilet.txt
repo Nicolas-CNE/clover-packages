@@ -1,0 +1,3 @@
+NAME=toilet
+VERSION=latest
+URL=https://github.com/cacalabs/toilet

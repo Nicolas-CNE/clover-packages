@@ -1,0 +1,3 @@
+NAME=fd
+VERSION=latest
+URL=https://github.com/sharkdp/fd

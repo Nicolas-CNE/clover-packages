@@ -1,0 +1,3 @@
+NAME=fzf
+VERSION=latest
+URL=https://github.com/junegunn/fzf

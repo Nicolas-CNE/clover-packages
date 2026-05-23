@@ -1,0 +1,3 @@
+NAME=sed
+VERSION=latest
+URL=https://github.com/bminor/sed

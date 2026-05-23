@@ -1,0 +1,3 @@
+NAME=ranger
+VERSION=latest
+URL=https://github.com/ranger/ranger

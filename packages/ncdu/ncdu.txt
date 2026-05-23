@@ -1,0 +1,3 @@
+NAME=ncdu
+VERSION=latest
+URL=https://github.com/git719/ncdu

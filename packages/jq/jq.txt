@@ -1,0 +1,3 @@
+NAME=jq
+VERSION=latest
+URL=https://github.com/jqlang/jq

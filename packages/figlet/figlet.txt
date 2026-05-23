@@ -1,0 +1,3 @@
+NAME=figlet
+VERSION=latest
+URL=https://github.com/cmatsuoka/figlet

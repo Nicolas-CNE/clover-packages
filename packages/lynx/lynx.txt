@@ -1,0 +1,3 @@
+NAME=lynx
+VERSION=latest
+URL=https://github.com/bminor/lynx

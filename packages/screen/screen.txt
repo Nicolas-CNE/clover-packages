@@ -1,0 +1,3 @@
+NAME=screen
+VERSION=latest
+URL=https://github.com/bminor/screen

@@ -1,0 +1,3 @@
+NAME=fortune-mod
+VERSION=latest
+URL=https://github.com/shlomif/fortune-mod

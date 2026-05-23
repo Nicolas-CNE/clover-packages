@@ -1,0 +1,3 @@
+NAME=cmus
+VERSION=latest
+URL=https://github.com/cmus/cmus

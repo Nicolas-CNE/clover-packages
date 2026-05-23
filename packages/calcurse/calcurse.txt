@@ -1,0 +1,3 @@
+NAME=calcurse
+VERSION=latest
+URL=https://github.com/lfos/calcurse
