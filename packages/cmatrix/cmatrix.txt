@@ -1,0 +1,3 @@
+NAME=cmatrix
+SOURCE_URL=https://github.com/abishekvashok/cmatrix/archive/refs/heads/master.tar.gz
+TYPE=c

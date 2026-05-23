@@ -1,0 +1,3 @@
+NAME=neofetch
+SOURCE_URL=https://github.com/dylanaraps/neofetch/archive/refs/tags/7.1.0.tar.gz
+TYPE=script

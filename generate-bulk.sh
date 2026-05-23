@@ -1,28 +1,24 @@
 #!/bin/bash
 
-paquetes=(
-    "neofetch|https://github.com/dylanaraps/neofetch|make"
-    "htop|https://github.com/htop-dev/htop|script"
-    "fetch|https://github.com/jschicht/fetch|make"
-    "cmatrix|https://github.com/bisqwit/cmatrix|make"
-)
+# Función para crear la receta
+create_recipe() {
+    local name=$1
+    local url=$2
+    local type=$3 # 'c' para compilar, 'script' para copiar directo
 
-echo "Starting Recipe generation."
+    mkdir -p packages/$name
+    cat <<EOF > packages/$name/$name.txt
+NAME=$name
+SOURCE_URL=$url
+TYPE=$type
+EOF
+    echo "Receta para $name generada (Tipo: $type)"
+}
 
-for item in "${paquetes[@]}"; do
-    IFS="|" read -r name repo build <<< "$item"
-    dir="packages/$name"
-    
-    echo " -> Procesando: $name"
-    mkdir -p "$dir"
-    
-    cat << EOR > "$dir/recipe.txt"
-NAME="$name"
-REPO="$repo"
-BUILD_SYSTEM="$build"
-DEPENDENCIES="gcc,make"
-EOR
-done
-
-echo "Recipes loaded locally."
-
+# --- ADDED PACKAGES ---
+create_recipe "neofetch" "https://github.com/dylanaraps/neofetch/archive/refs/tags/7.1.0.tar.gz" "script"
+create_recipe "cmatrix" "https://github.com/abishekvashok/cmatrix/archive/refs/heads/master.tar.gz" "c"
+create_recipe "cowsay" "https://github.com/takinami/cowsay/archive/refs/heads/master.tar.gz" "script"
+# ---------------------------------------------
+create_recipe "nano" "https://github.com/nano-editor/nano/archive/refs/tags/v8.0.tar.gz" "c"
+create_recipe "htop" "https://github.com/htop-dev/htop/archive/refs/tags/3.3.0.tar.gz" "c"

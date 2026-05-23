@@ -1,0 +1,3 @@
+NAME=cowsay
+SOURCE_URL=https://github.com/takinami/cowsay/archive/refs/heads/master.tar.gz
+TYPE=script
