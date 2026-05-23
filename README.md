@@ -24,3 +24,4 @@ script (install.sh)
 Clover Linux is an arch-based Linux distribution built from scratch. 
 A lot of the code is vibe-coded, keep in mind I'm just a beginner :))
 thank you for reading
+(Ignore "subiendo recetas masivas" commits on some of the packages, it was a debug commit :))
