@@ -1,0 +1,4 @@
+cmatrix
+fetch
+htop
+neofetch
