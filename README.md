@@ -10,10 +10,10 @@ To install a package, use:
 bash:
 fortune install <package_name>
 
-Contributing
+Contributing:
 To add new packages, please update the generate-bulk.sh script and run it to regenerate the recipe files.
 
-Build Systems Supported
+Build Systems Supported:
 make
 
 cmake
