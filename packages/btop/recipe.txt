@@ -1,0 +1,4 @@
+NAME="btop"
+REPO="https://github.com/aristocratos/btop"
+BUILD_SYSTEM="make"
+DEPENDENCIES="gcc,g++"

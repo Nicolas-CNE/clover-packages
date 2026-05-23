@@ -1,0 +1,4 @@
+NAME="cmatrix"
+REPO="https://github.com/bisqwit/cmatrix"
+BUILD_SYSTEM="make"
+DEPENDENCIES="gcc,make"
