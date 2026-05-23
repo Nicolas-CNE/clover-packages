@@ -7,7 +7,7 @@ This repository contains automated build instructions for various system utiliti
 This repository is intended to be used with the **Fortune** package manager. 
 To install a package, use:
 
-bash
+bash:
 fortune install <package_name>
 
 Contributing
