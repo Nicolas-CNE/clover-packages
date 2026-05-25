@@ -1,0 +1,2 @@
+REPO="https://github.com/nano-editor/nano"
+BUILD_SYSTEM="make"
