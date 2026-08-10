@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Función para crear la receta
+# function to create the recipes n stuff
 create_recipe() {
     local name=$1
     local url=$2
-    local type=$3 # 'c' para compilar, 'script' para copiar directo
+    local type=$3 # "c" to compile and "script" to copy
 
     mkdir -p packages/$name
     cat <<EOF > packages/$name/$name.txt
@@ -12,7 +12,7 @@ NAME=$name
 SOURCE_URL=$url
 TYPE=$type
 EOF
-    echo "Receta para $name generada (Tipo: $type)"
+    echo "Generated recipe for $name (Type: $type)"
 }
 
 # --- ADDED PACKAGES ---
