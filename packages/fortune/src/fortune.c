@@ -1,9 +1,10 @@
 /*Fortune PM*/
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
@@ -31,112 +32,199 @@ void search_packages(const char *keyword);
 int is_root();
 int get_recipe_value(const char *recipe_path, const char *key, char *output, size_t max_len);
 int confirm_action(const char *message);
+void resolve_and_install(const char *pkg_name);
+int fetch_clover_recipe(const char *pkg_name);
+int run_cmd_check_cancel(const char *cmd);
+
+/* see if the lil bitch ctrl c'ed it */
+int run_cmd_check_cancel(const char *cmd) {
+    int status = system(cmd);
+    
+    if (WIFSIGNALED(status) && (WTERMSIG(status) == SIGINT || WTERMSIG(status) == SIGQUIT)) {
+        fprintf(stderr, "\n[Clover PM] Operación cancelada por el usuario.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 130) {
+        fprintf(stderr, "\n[Clover PM] Operación cancelada por el usuario.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return status;
+}
+
+int fetch_clover_recipe(const char *pkg_name) {
+    char build_cmd[1024];
+    char recipe_path[256];
+    snprintf(recipe_path, sizeof(recipe_path), "/tmp/%s.recipe", pkg_name);
+    snprintf(build_cmd, sizeof(build_cmd), 
+             "curl -sL -f -o %s " REPO_BASE_URL "/%s/%s.recipe 2>/dev/null", 
+             recipe_path, pkg_name, pkg_name);
+    
+    return (run_cmd_check_cancel(build_cmd) == 0);
+}
+
+void resolve_and_install(const char *pkg_name) {
+    if (!is_root()) {
+        fprintf(stderr, "[Clover PM] Error: Necesitás permisos de root (sudo) para instalar.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // clover on top
+    if (fetch_clover_recipe(pkg_name)) {
+        if (flag_verbose) printf("[Clover PM] Receta encontrada en clover-packages. Compilando...\n");
+        install_package(pkg_name);
+        return;
+    }
+
+    char build_cmd[2048];
+
+    // fallback to arch repo
+    if (flag_verbose) printf("[Clover PM] Buscando en repositorios oficiales de Arch Linux...\n");
+    
+    snprintf(build_cmd, sizeof(build_cmd),
+             "mkdir -p /tmp/clover_abs && cd /tmp/clover_abs && "
+             "rm -rf %s && "
+             "git clone --depth 1 https://gitlab.archlinux.org/archlinux/packaging/packages/%s.git 2>/dev/null",
+             pkg_name, pkg_name);
+
+    if (run_cmd_check_cancel(build_cmd) == 0) {
+        if (flag_verbose) printf("[Clover PM] Clonado desde repos oficiales. Ejecutando makepkg...\n");
+        
+        snprintf(build_cmd, sizeof(build_cmd),
+                 "cd /tmp/clover_abs/%s && "
+                 "chown -R 1000:1000 . && "
+                 "runuser -u $(id -un 1000) -- makepkg -si --noconfirm --needed",
+                 pkg_name);
+                 
+        if (run_cmd_check_cancel(build_cmd) == 0) {
+            printf("[Clover PM] '%s' instalado con éxito desde Arch Oficial.\n", pkg_name);
+            return;
+        } else {
+            // if clone ended but not ctrl c then uhh idk man i forgor
+            fprintf(stderr, "[Clover PM] Error: La compilación de '%s' falló.\n", pkg_name);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // fallback to aur
+    if (flag_verbose) printf("[Clover PM] No estaba en el oficial. Buscando en AUR...\n");
+
+    snprintf(build_cmd, sizeof(build_cmd),
+             "mkdir -p /tmp/clover_abs && cd /tmp/clover_abs && "
+             "rm -rf %s && "
+             "git clone --depth 1 https://aur.archlinux.org/%s.git 2>/dev/null",
+             pkg_name, pkg_name);
+
+    if (run_cmd_check_cancel(build_cmd) == 0) {
+        if (flag_verbose) printf("[Clover PM] Clonado desde AUR. Ejecutando makepkg...\n");
+        
+        snprintf(build_cmd, sizeof(build_cmd),
+                 "cd /tmp/clover_abs/%s && "
+                 "chown -R 1000:1000 . && "
+                 "runuser -u $(id -un 1000) -- makepkg -si --noconfirm --needed",
+                 pkg_name);
+                 
+        if (run_cmd_check_cancel(build_cmd) == 0) {
+            printf("[Clover PM] '%s' instalado con éxito desde AUR.\n", pkg_name);
+            return;
+        } else {
+            fprintf(stderr, "[Clover PM] Error: La compilación desde AUR para '%s' falló.\n", pkg_name);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    fprintf(stderr, "[Clover PM] Error: No se encontró '%s' en Clover, Arch Oficial ni AUR.\n", pkg_name);
+    exit(EXIT_FAILURE);
+}
 
 void install_package(const char *pkg_name) {
     char url_base[MAX_URL_LEN] = {0};
     char build_cmd[4096] = {0};
     char tmp_tarball[] = "/tmp/pkg.tar.gz";
     char tmp_dir[] = "/tmp/pkg_src";
+    char recipe_path[256];
     int ret;
 
-    // Determine URL base from pkg_name or alias
-    if (strcmp(pkg_name, "cmatrix") == 0) {
-        snprintf(url_base, sizeof(url_base), "https://github.com/bisqwit/cmatrix");
-    } else {
-        // Assume pkg_name is a full GitHub repo URL
+    snprintf(recipe_path, sizeof(recipe_path), "/tmp/%s.recipe", pkg_name);
+
+    if (strstr(pkg_name, "http://") || strstr(pkg_name, "https://")) {
         strncpy(url_base, pkg_name, sizeof(url_base) - 1);
+    } else {
+        if (!get_recipe_value(recipe_path, "URL", url_base, sizeof(url_base))) {
+            fprintf(stderr, "[Clover PM] Error: No se pudo leer la clave 'URL' en %s.\n", recipe_path);
+            exit(1);
+        }
     }
 
-    // Clean previous workspace safely
-    snprintf(build_cmd, sizeof(build_cmd), "rm -rf %s %s", tmp_dir, tmp_tarball);
-    system(build_cmd);
-
-    // Universal single-line fallback loop using curl -f (fails on 404)
-    snprintf(build_cmd, sizeof(build_cmd),
-        "bash -c '"
-        "SUCCESS=1; "
-        "for branch in master main develop trunk; do "
-        "  if curl -L -s -A \"Mozilla/5.0\" -f -o %s \"%s/archive/refs/heads/${branch}.tar.gz\"; then "
-        "    SUCCESS=0; break; "
-        "  fi; "
-        "done; "
-        "if [ $SUCCESS -ne 0 ]; then "
-        "  curl -L -s -A \"Mozilla/5.0\" -f -o %s \"%s/archive/refs/heads/master.zip\"; "
-        "fi'",
-        tmp_tarball, url_base, tmp_tarball, url_base);
+    if (strstr(url_base, ".tar.gz") || strstr(url_base, ".zip")) {
+        snprintf(build_cmd, sizeof(build_cmd), "curl -L -s -A \"Mozilla/5.0\" -f -o %s \"%s\"", tmp_tarball, url_base);
+    } else {
+        snprintf(build_cmd, sizeof(build_cmd),
+            "bash -c '"
+            "SUCCESS=1; "
+            "for branch in master main develop trunk; do "
+            "  if curl -L -s -A \"Mozilla/5.0\" -f -o %s \"%s/archive/refs/heads/${branch}.tar.gz\"; then "
+            "    SUCCESS=0; break; "
+            "  fi; "
+            "done; "
+            "if [ $SUCCESS -ne 0 ]; then "
+            "  curl -L -s -A \"Mozilla/5.0\" -f -o %s \"%s/archive/refs/heads/master.zip\"; "
+            "fi'",
+            tmp_tarball, url_base, tmp_tarball, url_base);
+    }
 
     if (flag_verbose) {
-        printf("[Clover PM] Downloading source code from repository with fallback branches...\n");
-        printf("[Clover PM] Running command:\n%s\n", build_cmd);
+        printf("[Clover PM] Downloading source code from: %s\n", url_base);
     }
 
-    system(build_cmd);
+    run_cmd_check_cancel(build_cmd);
 
-    // Robust file size verification (Must exist and be > 100 bytes to avoid garbage)
     snprintf(build_cmd, sizeof(build_cmd),
         "bash -c 'if [ ! -s %s ] || [ $(wc -c < %s) -lt 100 ]; then exit 1; fi'",
         tmp_tarball, tmp_tarball);
 
-    ret = system(build_cmd);
+    ret = run_cmd_check_cancel(build_cmd);
     if (ret != 0) {
-        fprintf(stderr, "[Clover PM] Error: Source code could not be downloaded from any known branch (404) or archive is invalid.\n");
+        fprintf(stderr, "[Clover PM] Error: Source code download failed or file invalid.\n");
         exit(1);
     }
 
-    // Prepare source extraction directory
     snprintf(build_cmd, sizeof(build_cmd), "mkdir -p %s", tmp_dir);
-    system(build_cmd);
+    run_cmd_check_cancel(build_cmd);
 
-    // Extract package based on file type header signature or extension
-    if (strstr(url_base, ".zip") != NULL || access(tmp_tarball, F_OK) == 0 && system("file /tmp/pkg.tar.gz | grep -q 'Zip'") == 0) {
+    if (strstr(url_base, ".zip") != NULL) {
         snprintf(build_cmd, sizeof(build_cmd), "unzip -q %s -d %s && mv %s/*/* %s/ 2>/dev/null || true", tmp_tarball, tmp_dir, tmp_dir, tmp_dir);
     } else {
-        snprintf(build_cmd, sizeof(build_cmd), "tar -xzf %s -C %s --strip-components=1 2>/dev/null || tar -xzf %s -C %s", tmp_tarball, tmp_dir, tmp_tarball, tmp_dir);
+        snprintf(build_cmd, sizeof(build_cmd), "tar -xzf %s -C %s --strip-components=1 2>/dev/null || tar -xzf %s -C %s", tmp_tarball, tmp_dir, tmp_dir, tmp_dir);
     }
     
-    if (flag_verbose) {
-        printf("[Clover PM] Extracting source archive...\n");
-    }
-    
-    ret = system(build_cmd);
-    if (ret != 0) {
-        fprintf(stderr, "[Clover PM] Error: Failed to extract source archive.\n");
-        exit(1);
-    }
+    run_cmd_check_cancel(build_cmd);
 
-    // Change directory to source
     if (chdir(tmp_dir) != 0) {
-        perror("[Clover PM] Error: Cannot change directory to source");
+        perror("[Clover PM] Error changing directory");
         exit(1);
     }
 
-    // Detect build system and build accordingly
-    if (access("Makefile", F_OK) == 0) {
-        if (flag_verbose) printf("[Clover PM] Detected Makefile, running 'make && make install'\n");
-        ret = system("make && make install");
-    } else if (access("CMakeLists.txt", F_OK) == 0) {
-        if (flag_verbose) printf("[Clover PM] Detected CMakeLists.txt, running cmake build sequence\n");
-        ret = system("mkdir -p build && cd build && cmake .. && make && make install");
-    } else if (access("install.sh", F_OK) == 0) {
-        if (flag_verbose) printf("[Clover PM] Detected install.sh, running it\n");
-        ret = system("chmod +x install.sh && ./install.sh");
-    } else if (access("autogen.sh", F_OK) == 0 || access("configure", F_OK) == 0) {
-        if (flag_verbose) printf("[Clover PM] Detected autogen.sh or configure, running GNU Autotools pipeline\n");
-        ret = system("if [ -f autogen.sh ]; then chmod +x autogen.sh && ./autogen.sh; fi && [ -f configure ] && chmod +x configure && ./configure && make && make install");
+    if (access("CMakeLists.txt", F_OK) == 0) {
+        if (flag_verbose) printf("[Clover PM] Running CMake & Ninja build sequence...\n");
+        ret = run_cmd_check_cancel("mkdir -p build && cd build && cmake -G Ninja .. && ninja && ninja install");
+    } else if (access("Makefile", F_OK) == 0) {
+        if (flag_verbose) printf("[Clover PM] Running Make...\n");
+        ret = run_cmd_check_cancel("make && make install");
     } else {
-        fprintf(stderr, "[Clover PM] Error: Unknown build system. No Makefile, CMakeLists.txt, install.sh, autogen.sh, or configure found.\n");
+        fprintf(stderr, "[Clover PM] Error: Unknown build system.\n");
         exit(1);
     }
 
     if (ret != 0) {
-        fprintf(stderr, "[Clover PM] Error: Build or installation process failed.\n");
+        fprintf(stderr, "[Clover PM] Error: Build or installation failed.\n");
         exit(1);
     }
 
-    // Cleanup workspace
     chdir("/");
-    snprintf(build_cmd, sizeof(build_cmd), "rm -rf %s %s", tmp_dir, tmp_tarball);
-    system(build_cmd);
+    snprintf(build_cmd, sizeof(build_cmd), "rm -rf %s %s %s", tmp_dir, tmp_tarball, recipe_path);
+    run_cmd_check_cancel(build_cmd);
 
     printf("[Clover PM] Installation of '%s' completed successfully.\n", pkg_name);
 }
@@ -164,7 +252,23 @@ int is_root() {
 }
 
 int get_recipe_value(const char *recipe_path, const char *key, char *output, size_t max_len) {
-    (void)recipe_path; (void)key; (void)output; (void)max_len;
+    FILE *fp = fopen(recipe_path, "r");
+    if (!fp) return 0;
+
+    char line[512];
+    size_t key_len = strlen(key);
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, key, key_len) == 0 && line[key_len] == '=') {
+            char *val = line + key_len + 1;
+            val[strcspn(val, "\r\n")] = 0;
+            strncpy(output, val, max_len - 1);
+            fclose(fp);
+            return 1;
+        }
+    }
+
+    fclose(fp);
     return 0;
 }
 
@@ -207,7 +311,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Error: No package specified for install.\n");
             exit(EXIT_FAILURE);
         }
-        install_package(pkg_arg);
+        resolve_and_install(pkg_arg);
     } else if (strcmp(command, "uninstall") == 0) {
         if (!pkg_arg) {
             fprintf(stderr, "Error: No package specified for uninstall.\n");
