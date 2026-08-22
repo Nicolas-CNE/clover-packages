@@ -1,0 +1,6 @@
+NAME=coreutils
+VERSION=9.4
+URL=https://ftp.gnu.org/gnu/coreutils/coreutils-9.4.tar.xz
+SOURCE_TYPE=autotools
+DEPS=gmp
+BUILD_STEPS=./configure --prefix=/usr --enable-no-install-program=kill,uptime && make -j$(nproc) && make DESTDIR=$DESTDIR install

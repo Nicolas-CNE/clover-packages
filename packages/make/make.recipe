@@ -1,0 +1,6 @@
+NAME=make
+VERSION=4.4.1
+URL=https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
+SOURCE_TYPE=autotools
+DEPS=
+BUILD_STEPS=./configure --prefix=/usr && make -j$(nproc) && make DESTDIR=$DESTDIR install
