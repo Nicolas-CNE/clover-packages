@@ -4,4 +4,3 @@ URL=https://github.com/clover-linux/meta/archive/refs/heads/main.tar.gz
 SOURCE_TYPE=custom
 DEPS=build-essentials,coreutils,bash,e2fsprogs,kmod,busybox
 BUILD_STEPS=echo 'Clover Linux base system meta-package installed successfully.'
-BUILD_STEPS=CFLAGS="-O2 -std=gnu11" ./configure --prefix=/usr && make -j$(nproc) && make DESTDIR="$DESTDIR" install
