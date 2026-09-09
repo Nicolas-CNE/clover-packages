@@ -1,6 +1,6 @@
 NAME=kmod
-VERSION=31
-URL=https://mirrors.kernel.org/pub/linux/utils/kernel/kmod/kmod-31.tar.xz
+VERSION=34
+URL=https://mirrors.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.tar.xz
 SOURCE_TYPE=autotools
 DEPS=zlib,zstd
 BUILD_STEPS=./configure --prefix=/usr --bindir=/bin --sysconfdir=/etc --with-zstd --with-zlib && make -j$(nproc) && make DESTDIR=$DESTDIR install
