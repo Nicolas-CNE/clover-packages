@@ -1,0 +1,339 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <ftw.h>
+#include "core.h"
+#include "parser.h"
+#include "network.h"
+#include "db.h"
+
+#define RECIPES_DIR "/var/lib/fortune/recipes"
+
+static int run_command(const char *cmd) {
+    printf("\033[90m[EXEC]\033[0m %s\n", cmd);
+    int res = system(cmd);
+    return WEXITSTATUS(res);
+}
+
+int core_verify_privileges(void) {
+    if (geteuid() != 0) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m Este comando requiere permisos de superusuario (root).\n");
+        return -1;
+    }
+    return 0;
+}
+
+static void resolve_work_directory(const char *base_build, const Recipe *r, char *target_dir, size_t target_size) {
+    char test_path[1024];
+
+    // 1. Si el tarball fue extraído con --strip-components=1, los builds (Makefile, configure, CMakeLists)
+    //    están directamente en la raíz de base_build.
+    snprintf(test_path, sizeof(test_path), "%s/Makefile", base_build);
+    if (access(test_path, F_OK) == 0) {
+        snprintf(target_dir, target_size, "%s", base_build);
+        return;
+    }
+
+    snprintf(test_path, sizeof(test_path), "%s/configure", base_build);
+    if (access(test_path, F_OK) == 0) {
+        snprintf(target_dir, target_size, "%s", base_build);
+        return;
+    }
+
+    snprintf(test_path, sizeof(test_path), "%s/CMakeLists.txt", base_build);
+    if (access(test_path, F_OK) == 0) {
+        snprintf(target_dir, target_size, "%s", base_build);
+        return;
+    }
+
+    // 2. Si se extrajo manteniendo la estructura de carpetas (ej. name-version/)
+    snprintf(test_path, sizeof(test_path), "%s/%s-%s", base_build, r->name, r->version);
+    struct stat st;
+    if (stat(test_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        snprintf(target_dir, target_size, "%s", test_path);
+        return;
+    }
+
+    // 3. Fallback: buscar un subdirectorio que REALMENTE contenga un sistema de build válido
+    DIR *d = opendir(base_build);
+    if (d) {
+        struct dirent *dir;
+        while ((dir = readdir(d)) != NULL) {
+            if (dir->d_name[0] != '.') {
+                snprintf(test_path, sizeof(test_path), "%s/%s", base_build, dir->d_name);
+                if (stat(test_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                    char sub_mk[1024];
+                    snprintf(sub_mk, sizeof(sub_mk), "%s/Makefile", test_path);
+                    if (access(sub_mk, F_OK) == 0) {
+                        snprintf(target_dir, target_size, "%s", test_path);
+                        closedir(d);
+                        return;
+                    }
+                }
+            }
+        }
+        closedir(d);
+    }
+
+    // Default: usar base_build
+    snprintf(target_dir, target_size, "%s", base_build);
+}
+
+static int execute_recipe_build(const Recipe *r, const char *work_dir, const char *fakeroot) {
+    (void)work_dir;
+    char cmd[4096];
+
+    if (strcmp(r->source_type, "meta") == 0 || strcmp(r->source_type, "none") == 0) {
+        printf("\033[34m[INFO]\033[0m Paquete meta/vacío detectado. Omitiendo fase de compilación.\n");
+        return 0;
+    }
+
+    if (r->build_steps && r->build_steps[0] != '\0') {
+        snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && sh -c '%s'", fakeroot, r->build_steps);
+        return run_command(cmd);
+    }
+
+    if (strcmp(r->source_type, "cmake") == 0 || access("CMakeLists.txt", F_OK) == 0) {
+        snprintf(cmd, sizeof(cmd), "cmake -B build -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build && DESTDIR=\"%s\" cmake --install build", fakeroot);
+        return run_command(cmd);
+    } 
+    
+    if (strcmp(r->source_type, "autotools") == 0 || access("configure", F_OK) == 0) {
+        snprintf(cmd, sizeof(cmd), "./configure --prefix=/usr && make -j$(nproc) && make DESTDIR=\"%s\" install", fakeroot);
+        return run_command(cmd);
+    }
+
+    fprintf(stderr, "\033[31m[ERROR]\033[0m No se reconoció el sistema de compilación ni existen BUILD_STEPS explícitos.\n");
+    return -1;
+}
+
+static PackageRecord *current_rec_scan = NULL;
+
+static int scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    (void)sb; (void)typeflag; (void)ftwbuf;
+    if (typeflag == FTW_F || typeflag == FTW_SL) {
+        const char *rel_path = fpath;
+        if (strncmp(rel_path, current_rec_scan->files[0], strlen(current_rec_scan->files[0])) == 0) {
+            rel_path += strlen(current_rec_scan->files[0]);
+        }
+        if (strlen(rel_path) > 0) {
+            current_rec_scan->files = realloc(current_rec_scan->files, sizeof(char *) * (current_rec_scan->file_count + 1));
+            current_rec_scan->files[current_rec_scan->file_count] = strdup(rel_path);
+            current_rec_scan->file_count++;
+        }
+    }
+    return 0;
+}
+
+static void scan_and_populate_files(const char *fakeroot_path, PackageRecord *rec) {
+    rec->files = malloc(sizeof(char *));
+    rec->files[0] = strdup(fakeroot_path);
+    rec->file_count = 0;
+
+    current_rec_scan = rec;
+    nftw(fakeroot_path, scan_callback, 20, FTW_PHYS);
+
+    free(rec->files[0]);
+    for (int i = 0; i < rec->file_count; i++) {
+        rec->files[i] = rec->files[i+1];
+    }
+}
+
+static void core_install_single(Recipe *r) {
+    char tmp_dir[] = "/tmp/fortune_XXXXXX";
+    if (!mkdtemp(tmp_dir)) return;
+
+    char build_dir[512], actual_work_dir[1024], archive[512], fakeroot[512], cmd[4096];
+    snprintf(build_dir, sizeof(build_dir), "%s/build", tmp_dir);
+    snprintf(archive, sizeof(archive), "%s/source.tmp", tmp_dir);
+    snprintf(fakeroot, sizeof(fakeroot), "%s/fakeroot", tmp_dir);
+
+    mkdir(build_dir, 0755);
+    mkdir(fakeroot, 0755);
+
+    // Prioridad 1: Clonar vía GIT si GIT_URL está definido
+    if (strlen(r->git_url) > 0) {
+        printf("\033[34m[INFO]\033[0m Clonando repositorio Git %s...\n", r->git_url);
+        if (strlen(r->branch_tag) > 0) {
+            snprintf(cmd, sizeof(cmd), "git clone --depth 1 --branch %s %s %s", r->branch_tag, r->git_url, build_dir);
+        } else {
+            snprintf(cmd, sizeof(cmd), "git clone --depth 1 %s %s", r->git_url, build_dir);
+        }
+        if (run_command(cmd) != 0) return;
+    }
+    // Prioridad 2: Descargar Tarball si URL tradicional existe
+    else if (strlen(r->source_url) > 0 && strcmp(r->source_url, "none") != 0) {
+        printf("\033[34m[INFO]\033[0m Descargando %s...\n", r->source_url);
+        if (net_download_file(r->source_url, archive) != 0) return;
+        snprintf(cmd, sizeof(cmd), "tar -xf %s -C %s --strip-components=1 2>/dev/null || tar -xf %s -C %s", archive, build_dir, archive, build_dir);
+        run_command(cmd);
+    }
+
+    resolve_work_directory(build_dir, r, actual_work_dir, sizeof(actual_work_dir));
+    chdir(actual_work_dir);
+
+    printf("\033[34m[INFO]\033[0m Compilando %s en %s...\n", r->name, actual_work_dir);
+    int install_res = execute_recipe_build(r, actual_work_dir, fakeroot);
+
+    if (install_res != 0) {
+        chdir("/tmp");
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+        run_command(cmd);
+        return;
+    }
+
+    PackageRecord rec;
+    memset(&rec, 0, sizeof(PackageRecord));
+    snprintf(rec.name, sizeof(rec.name), "%s", r->name);
+    snprintf(rec.version, sizeof(rec.version), "%s", r->version);
+
+    scan_and_populate_files(fakeroot, &rec);
+
+    snprintf(cmd, sizeof(cmd), "cp -r %s/* / 2>/dev/null || true", fakeroot);
+    run_command(cmd);
+    db_register_package(&rec);
+
+    if (rec.files) {
+        for (int i = 0; i < rec.file_count; i++) free(rec.files[i]);
+        free(rec.files);
+    }
+
+    printf("\033[32m[SUCCESS]\033[0m %s %s instalado correctamente.\n", r->name, r->version);
+    chdir("/tmp");
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+    run_command(cmd);
+}
+
+void core_install(const char *pkg_name) {
+    printf("\033[34m[INFO]\033[0m Instalando paquete '%s' desde la receta...\n", pkg_name);
+
+    char recipe_path[512];
+    snprintf(recipe_path, sizeof(recipe_path), "%s/packages/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
+
+    Recipe *r = parser_parse_recipe(recipe_path);
+    if (!r) {
+        // Buscar también en la raíz de recipes por si la estructura es plana
+        snprintf(recipe_path, sizeof(recipe_path), "%s/%s.recipe", RECIPES_DIR, pkg_name);
+        r = parser_parse_recipe(recipe_path);
+    }
+
+    if (!r) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m No se encontró la receta para '%s'. Tirá 'fortune sync'.\n", pkg_name);
+        return;
+    }
+
+    core_install_single(r);
+    parser_free_recipe(r);
+}
+
+void core_uninstall(const char *pkg_name) {
+    if (core_verify_privileges() != 0) return;
+    db_unregister_package(pkg_name);
+}
+
+void core_list_installed(void) {
+    printf("\033[34m[INFO]\033[0m Listando paquetes instalados...\n");
+
+    DIR *d = opendir("/var/lib/fortune");
+    if (!d) {
+        printf("No hay paquetes instalados o no existe /var/lib/fortune.\n");
+        return;
+    }
+
+    struct dirent *dir;
+    int count = 0;
+
+    while ((dir = readdir(d)) != NULL) {
+        char *ext = strrchr(dir->d_name, '.');
+        if (ext && strcmp(ext, ".manifest") == 0) {
+            char pkg_name[256];
+            size_t len = ext - dir->d_name;
+            snprintf(pkg_name, sizeof(pkg_name), "%.*s", (int)len, dir->d_name);
+
+            PackageRecord *pkg = db_get_package(pkg_name);
+            if (pkg) {
+                printf("  • \033[1m%s\033[0m v%s (%d archivos)\n", pkg->name, pkg->version, pkg->file_count);
+                db_free_record(pkg);
+                count++;
+            }
+        }
+    }
+
+    closedir(d);
+
+    if (count == 0) {
+        printf("  (Ningún paquete instalado aún)\n");
+    }
+}
+
+int core_pkg_build(const char *pkg_name) {
+    char recipe_path[256];
+    snprintf(recipe_path, sizeof(recipe_path), "%s/packages/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
+
+    Recipe *r = parser_parse_recipe(recipe_path);
+    if (!r) return -1;
+
+    char tmp_dir[] = "/tmp/fortune_build_XXXXXX";
+    if (!mkdtemp(tmp_dir)) {
+        parser_free_recipe(r);
+        return -1;
+    }
+
+    char build_dir[512], actual_work_dir[1024], archive[512], fakeroot[512], cmd[4096];
+    snprintf(build_dir, sizeof(build_dir), "%s/build", tmp_dir);
+    snprintf(archive, sizeof(archive), "%s/source.tmp", tmp_dir);
+    snprintf(fakeroot, sizeof(fakeroot), "%s/fakeroot", tmp_dir);
+
+    mkdir(build_dir, 0755);
+    mkdir(fakeroot, 0755);
+
+    if (strlen(r->git_url) > 0) {
+        if (strlen(r->branch_tag) > 0) {
+            snprintf(cmd, sizeof(cmd), "git clone --depth 1 --branch %s %s %s", r->branch_tag, r->git_url, build_dir);
+        } else {
+            snprintf(cmd, sizeof(cmd), "git clone --depth 1 %s %s", r->git_url, build_dir);
+        }
+        if (run_command(cmd) != 0) {
+            parser_free_recipe(r);
+            return -1;
+        }
+    } else if (strlen(r->source_url) > 0 && strcmp(r->source_url, "none") != 0) {
+        if (net_download_file(r->source_url, archive) != 0) {
+            parser_free_recipe(r);
+            return -1;
+        }
+        snprintf(cmd, sizeof(cmd), "tar -xf %s -C %s --strip-components=1 2>/dev/null || tar -xf %s -C %s", archive, build_dir, archive, build_dir);
+        run_command(cmd);
+    }
+
+    resolve_work_directory(build_dir, r, actual_work_dir, sizeof(actual_work_dir));
+    chdir(actual_work_dir);
+
+    int res = execute_recipe_build(r, actual_work_dir, fakeroot);
+
+    if (res != 0) {
+        chdir("/tmp");
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+        run_command(cmd);
+        parser_free_recipe(r);
+        return -1;
+    }
+
+    char pkg_filename[256];
+    snprintf(pkg_filename, sizeof(pkg_filename), "%s-%s-x86_64.tar.xz", r->name, r->version);
+
+    snprintf(cmd, sizeof(cmd), "tar -cJf /tmp/%s -C %s .", pkg_filename, fakeroot);
+    if (run_command(cmd) == 0) {
+        printf("\033[32m[SUCCESS]\033[0m Paquete generado en /tmp/%s\n", pkg_filename);
+    }
+
+    chdir("/tmp");
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+    run_command(cmd);
+
+    parser_free_recipe(r);
+    return 0;
+}
