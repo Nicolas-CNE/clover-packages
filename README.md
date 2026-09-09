@@ -21,10 +21,4 @@ cmake
 script (install.sh)
 
 ## About
-Clover Linux is an arch-based Linux distribution built from scratch. 
-A lot of the code is vibe-coded, keep in mind I'm just a beginner :))
-thank you for reading
-(Ignore "subiendo recetas masivas" commits on some of the packages, it was a debug commit :))
-
-(update: you might need some dependencies:
-Meson, Ninja, Git, Make, Cmake)
+Clover linux NO LONGER EXISTS, so yeah, only fortune survived my headaches
