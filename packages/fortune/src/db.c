@@ -14,6 +14,7 @@
 
 #define LOCK_FILE "/var/lib/fortune/fortune.lock"
 
+// Verificar si la ruta coincide exactamente con un directorio crítico del sistema
 static bool is_system_root_dir(const char *path) {
     const char *protected_dirs[] = {
         "/", "/bin", "/sbin", "/etc", "/lib", "/lib64", "/usr", 
@@ -30,14 +31,16 @@ static bool is_system_root_dir(const char *path) {
     return false;
 }
 
+// Validar que el nombre del paquete contenga solo caracteres alfanuméricos, guiones o guión bajo
 static bool is_valid_pkg_name(const char *name) {
     if (!name || strlen(name) == 0 || strlen(name) > 128) return false;
     for (int i = 0; name[i]; i++) {
-        if (!isalnum(name[i]) && name[i] != '-' && name[i] != '_') return false;
+        if (!isalnum((unsigned char)name[i]) && name[i] != '-' && name[i] != '_') return false;
     }
     return true;
 }
 
+// Crear directorio de la base de datos si no existe
 int db_init(void) {
     struct stat st = {0};
     const char *db_dir = "/var/lib/fortune";
@@ -49,6 +52,7 @@ int db_init(void) {
     return 0;
 }
 
+// Adquirir bloqueo exclusivo (flock)
 int db_lock(void) {
     db_init();
 
@@ -75,6 +79,7 @@ int db_lock(void) {
     return fd;
 }
 
+// Liberar bloqueo y eliminar el archivo lockfile
 void db_unlock(int fd) {
     if (fd >= 0) {
         flock(fd, LOCK_UN);
@@ -83,6 +88,7 @@ void db_unlock(int fd) {
     }
 }
 
+// Comprobar si el manifiesto del paquete existe en el sistema
 bool db_is_installed(const char *pkg_name) {
     if (!is_valid_pkg_name(pkg_name)) return false;
     char path[512];
@@ -90,6 +96,7 @@ bool db_is_installed(const char *pkg_name) {
     return (access(path, F_OK) == 0);
 }
 
+// Guardar los datos y la lista de archivos del paquete en su archivo .manifest
 int db_register_package(const PackageRecord *pkg) {
     if (!pkg || !is_valid_pkg_name(pkg->name)) return -1;
     char path[512];
@@ -122,27 +129,32 @@ int db_register_package(const PackageRecord *pkg) {
     return 0;
 }
 
+// Validar que la ruta sea segura para instalar/desinstalar y no sea un directorio protegido
 bool is_safe_path(const char *path) {
-    // Si la ruta es exactamente un directorio raíz de sistema, no es segura para borrar
+    if (!path || path[0] != '/') return false;
+
+    // Si es un directorio raíz/base de sistema, bloquear borrado
     if (is_system_root_dir(path)) {
         return false;
     }
 
-    // Prefijos seguros donde los paquetes suelen instalar archivos
+    // Prefijos válidos autorizados
     const char *safe_prefixes[] = {
         "/bin/", "/sbin/", "/lib/", "/lib64/",
-        "/usr/", "/opt/", "/etc/", "/var/lib/fortune/"
+        "/usr/", "/opt/", "/etc/", "/var/"
     };
-    int num_prefixes = (int)(sizeof(safe_prefixes) / sizeof(safe_prefixes[0]));
+    size_t num_prefixes = sizeof(safe_prefixes) / sizeof(safe_prefixes[0]);
 
-    for (int i = 0; i < num_prefixes; i++) {
+    for (size_t i = 0; i < num_prefixes; i++) {
         if (strncmp(path, safe_prefixes[i], strlen(safe_prefixes[i])) == 0) {
             return true;
         }
     }
+
     return false;
 }
 
+// Eliminar archivos, limpiar carpetas vacías y remover el .manifest
 int db_unregister_package(const char *pkg_name) {
     if (!is_valid_pkg_name(pkg_name)) return -1;
 
@@ -151,7 +163,7 @@ int db_unregister_package(const char *pkg_name) {
 
     printf("[FortunePM] Desinstalando %s...\n", pkg->name);
 
-    // PASE 1: Eliminar solo ARCHIVOS Y SYMLINKS
+    // PASE 1: Eliminar archivos y symlinks
     for (int i = 0; i < pkg->file_count; i++) {
         const char *file_path = pkg->files[i];
         if (file_path && file_path[0] == '/') {
@@ -159,8 +171,7 @@ int db_unregister_package(const char *pkg_name) {
                 struct stat st;
                 if (lstat(file_path, &st) == 0) {
                     if (S_ISDIR(st.st_mode)) {
-                        // Ignorar directorios en el primer pase
-                        continue;
+                        continue; // Omitir directorios en el primer pase
                     }
                     if (unlink(file_path) == 0) {
                         printf("  Borrado: %s\n", file_path);
@@ -174,14 +185,13 @@ int db_unregister_package(const char *pkg_name) {
         }
     }
 
-    // PASE 2: Limpiar DIRECTORIOS vacíos (recorriendo de atrás hacia adelante)
+    // PASE 2: Limpiar directorios vacíos en orden inverso
     for (int i = pkg->file_count - 1; i >= 0; i--) {
         const char *file_path = pkg->files[i];
         if (file_path && file_path[0] == '/' && !is_system_root_dir(file_path)) {
             struct stat st;
             if (lstat(file_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-                // rmdir solo tendrá éxito si el directorio quedó completamente vacío
-                rmdir(file_path);
+                rmdir(file_path); // Solo borra si quedó vacío
             }
         }
     }
@@ -194,6 +204,7 @@ int db_unregister_package(const char *pkg_name) {
     return ret;
 }
 
+// Leer y parsear el manifiesto de un paquete instalado
 PackageRecord *db_get_package(const char *pkg_name) {
     if (!is_valid_pkg_name(pkg_name)) return NULL;
     char path[512];
@@ -212,7 +223,7 @@ PackageRecord *db_get_package(const char *pkg_name) {
     bool in_files = false;
     int file_idx = 0;
 
-while (fgets(line, sizeof(line), f)) {
+    while (fgets(line, sizeof(line), f)) {
         line[strcspn(line, "\r\n")] = 0;
 
         if (strncmp(line, "NAME=", 5) == 0) {
@@ -236,13 +247,14 @@ while (fgets(line, sizeof(line), f)) {
     }
 
     if (in_files) {
-        pkg->file_count = file_idx; // Sincronizar el número real de archivos parseados
+        pkg->file_count = file_idx; // Sincronizar el número real de archivos leídos
     }
 
     fclose(f);
     return pkg;
 }
 
+// Liberar memoria asignada dinámicamente a PackageRecord
 void db_free_record(PackageRecord *pkg) {
     if (!pkg) return;
     if (pkg->files) {
