@@ -1,0 +1,8 @@
+NAME="openssl"
+VERSION="3.2.1"
+URL="https://www.openssl.org/source/openssl-3.2.1.tar.gz"
+DESCRIPTION="TLS/SSL cryptography library"
+DEPENDENCIES=""
+BUILD_STEPS="./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR="$DESTDIR" install"

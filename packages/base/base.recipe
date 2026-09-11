@@ -1,6 +1,6 @@
 NAME="base"
 VERSION="1.0.0"
-SOURCE_URL=""
+URL=""
 DESCRIPTION="Clover Linux Base System metapackage"
 DEPENDENCIES="bash coreutils busybox"
 BUILD_STEPS="mkdir -p "$DESTDIR/usr/share/doc/base"

@@ -1,7 +1,7 @@
 NAME="coreutils"
 VERSION="9.5"
-SOURCE_URL="https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz"
-DESCRIPTION="GNU core utilities (ls, cp, mv, etc)"
+URL="https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz"
+DESCRIPTION="GNU core utilities"
 DEPENDENCIES=""
 BUILD_STEPS="./configure --prefix=/usr
 make -j$(nproc)

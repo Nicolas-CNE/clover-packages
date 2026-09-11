@@ -1,6 +1,6 @@
 NAME="gcc"
 VERSION="13.2.0"
-SOURCE_URL="https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz"
+URL="https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz"
 DESCRIPTION="GNU Compiler Collection"
 DEPENDENCIES="make"
 BUILD_STEPS="./configure --prefix=/usr

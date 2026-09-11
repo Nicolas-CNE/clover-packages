@@ -1,0 +1,8 @@
+NAME="ncurses"
+VERSION="6.4"
+URL="https://ftp.gnu.org/gnu/ncurses/ncurses-6.4.tar.gz"
+DESCRIPTION="Terminal display library"
+DEPENDENCIES=""
+BUILD_STEPS="./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR="$DESTDIR" install"

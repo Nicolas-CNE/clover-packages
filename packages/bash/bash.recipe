@@ -1,6 +1,6 @@
 NAME="bash"
 VERSION="5.2.21"
-SOURCE_URL="https://ftp.gnu.org/gnu/bash/bash-5.2.21.tar.gz"
+URL="https://ftp.gnu.org/gnu/bash/bash-5.2.21.tar.gz"
 DESCRIPTION="The GNU Bourne Again Shell"
 DEPENDENCIES=""
 BUILD_STEPS="./configure --prefix=/usr

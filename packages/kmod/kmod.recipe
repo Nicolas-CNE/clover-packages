@@ -1,7 +1,7 @@
 NAME="kmod"
 VERSION="32"
-SOURCE_URL="https://kernel.org/pub/linux/utils/kernel/kmod/kmod-32.tar.xz"
-DESCRIPTION="Tools for loading and managing Linux kernel modules"
+URL="https://kernel.org/pub/linux/utils/kernel/kmod/kmod-32.tar.xz"
+DESCRIPTION="Kernel module utilities"
 DEPENDENCIES=""
 BUILD_STEPS="./configure --prefix=/usr
 make -j$(nproc)

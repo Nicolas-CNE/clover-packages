@@ -1,6 +1,6 @@
 NAME="htop"
 VERSION="3.3.0"
-SOURCE_URL="https://github.com/htop-dev/htop/archive/refs/tags/3.3.0.tar.gz"
+URL="https://github.com/htop-dev/htop/archive/refs/tags/3.3.0.tar.gz"
 DESCRIPTION="Interactive process viewer"
 DEPENDENCIES="ncurses"
 BUILD_STEPS="./configure --prefix=/usr
