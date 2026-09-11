@@ -111,11 +111,14 @@ static int dfs_visit(DepGraph *graph, int idx, char ***queue, int *queue_len, in
     node->state = DEPS_VISITING;
 
     for (int i = 0; i < node->dep_count; i++) {
-        int dep_idx = deps_find_node(graph, node->deps[i]);
-        if (dep_idx < 0) {
-            continue;
-        }
 
+     int dep_idx = deps_find_node(graph, node->deps[i]);
+     if (dep_idx < 0) {
+     if (errbuf && errlen > 0) {
+        snprintf(errbuf, errlen, "Dependencia no resuelta '%s' para el paquete '%s'", node->deps[i], node->name);
+     }
+     return -1;
+     }
         if (dfs_visit(graph, dep_idx, queue, queue_len, queue_cap, errbuf, errlen) != 0) {
             return -1;
         }
