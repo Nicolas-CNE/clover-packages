@@ -1,15 +1,20 @@
 CC = gcc
-CFLAGS = -O2 -Wall -Wextra -Isrc
-LIBS = -lcurl
-SRC = $(wildcard src/*.c)
+CFLAGS = -Wall -Wextra -O2
+LDFLAGS = -lcurl
+
+SRCS = main.c core.c parser.c net.c packsync.c
+OBJS = $(SRCS:.c=.o)
 TARGET = fortune
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LIBS)
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(OBJS) $(TARGET)
 
 .PHONY: all clean
