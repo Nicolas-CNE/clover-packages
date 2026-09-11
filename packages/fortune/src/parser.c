@@ -64,6 +64,10 @@ Recipe *parser_parse_recipe(const char *filepath) {
             snprintf(recipe->source_type, sizeof(recipe->source_type), "%s", trimmed + 12);
         } else if (strncmp(trimmed, "BUILD_STEPS=", 12) == 0) {
             snprintf(recipe->build_steps, sizeof(recipe->build_steps), "%s", trimmed + 12);
+        } else if (strncmp(trimmed, "DOWNLOAD_SIZE=", 14) == 0) {
+            snprintf(recipe->download_size, sizeof(recipe->download_size), "%s", trimmed + 14);
+        } else if (strncmp(trimmed, "INSTALLED_SIZE=", 15) == 0) {
+            snprintf(recipe->installed_size, sizeof(recipe->installed_size), "%s", trimmed + 15);
         } else if (strncmp(trimmed, "DEPENDENCIES=", 13) == 0 || strncmp(trimmed, "DEPS=", 5) == 0) {
             const char *deps_start = (trimmed[0] == 'D' && trimmed[1] == 'E' && trimmed[2] == 'P' && trimmed[3] == 'S') ? trimmed + 5 : trimmed + 13;
             char *deps_str = strdup(deps_start);
