@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "network.h"
 #include "db.h"
+#include "packsync.h"
 
 #define RECIPES_DIR "/var/lib/fortune/recipes"
 
@@ -267,11 +268,21 @@ static void core_install_single(Recipe *r) {
 }
 
 void core_install(const char *pkg_name) {
-    char recipe_path[256];
-    snprintf(recipe_path, sizeof(recipe_path), "%s/packages/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
+    // 1. Descarga la receta a demanda desde GitHub si no existe en local
+    if (fetch_recipe_if_missing(pkg_name, RECIPES_DIR) != 0) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo obtener la receta para: %s\n", pkg_name);
+        return;
+    }
+
+    // 2. Apunta a la ubicación local (/var/lib/fortune/recipes/<pkg>/<pkg>.recipe)
+    char recipe_path[512];
+    snprintf(recipe_path, sizeof(recipe_path), "%s/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
 
     Recipe *r = parser_parse_recipe(recipe_path);
-    if (!r) return;
+    if (!r) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m Error al parsear la receta: %s\n", recipe_path);
+        return;
+    }
 
     core_install_single(r);
     parser_free_recipe(r);
@@ -318,14 +329,26 @@ void core_list_installed(void) {
 }
 
 int core_pkg_build(const char *pkg_name) {
+    // 1. Aseguramos que la receta exista localmente (o la descarga a demanda)
+    if (fetch_recipe_if_missing(pkg_name, RECIPES_DIR) != 0) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo obtener la receta para: %s\n", pkg_name);
+        return -1;
+    }
+
+    // 2. Apuntamos al path local donde fetch_recipe_if_missing guardó la receta
     char recipe_path[256];
-    snprintf(recipe_path, sizeof(recipe_path), "%s/packages/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
+    snprintf(recipe_path, sizeof(recipe_path), "%s/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
 
     Recipe *r = parser_parse_recipe(recipe_path);
     if (!r) return -1;
 
+    // --- A PARTIR DE ACÁ TODO QUEDA 100% IGUAL ---
+
     char tmp_dir[] = "/tmp/fortune_build_XXXXXX";
-    if (!mkdtemp(tmp_dir)) return -1;
+    if (!mkdtemp(tmp_dir)) {
+        parser_free_recipe(r);
+        return -1;
+    }
 
     char build_dir[512], actual_work_dir[1024], archive[512], fakeroot[512], cmd[4096];
     snprintf(build_dir, sizeof(build_dir), "%s/build", tmp_dir);
@@ -342,11 +365,17 @@ int core_pkg_build(const char *pkg_name) {
             snprintf(cmd, sizeof(cmd), "git clone --depth 1 %s %s", r->git_url, build_dir);
         }
         if (run_command(cmd) != 0) {
+            chdir("/tmp");
+            snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+            run_command(cmd);
             parser_free_recipe(r);
             return -1;
         }
     } else if (strlen(r->source_url) > 0 && strcmp(r->source_url, "none") != 0) {
         if (net_download_file(r->source_url, archive) != 0) {
+            chdir("/tmp");
+            snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", tmp_dir);
+            run_command(cmd);
             parser_free_recipe(r);
             return -1;
         }
