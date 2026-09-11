@@ -12,6 +12,8 @@ typedef struct {
     char build_steps[2048];
     char **dependencies;
     int dep_count;
+    char download_size[64];   // <--- NUEVITIQUITIQUIRIJIYO
+    char installed_size[64];  // <--- NUEVITO
 } Recipe;
 
 Recipe *parser_parse_recipe(const char *filepath);
