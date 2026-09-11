@@ -113,7 +113,7 @@ static int execute_recipe_build(const Recipe *r, const char *work_dir, const cha
     }
 
     // Ejecuta BUILD_STEPS si la receta los define
-    if (r->build_steps && strlen(r->build_steps) > 0) {
+    if (r->build_steps[0] != '\0') {
         char script_path[512];
         snprintf(script_path, sizeof(script_path), "%s/../fortune_build.sh", fakeroot);
 
