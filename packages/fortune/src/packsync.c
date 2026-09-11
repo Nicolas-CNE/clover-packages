@@ -52,9 +52,9 @@ int fortune_sync_repository(const char *repo_url, const char *target_dir) {
 
     // 3. Extraer ÚNICAMENTE las recetas (descartando READMEs, scripts y licencias)
     // --strip-components=2 remueve el directorio raiz de GitHub (ej: clover-packages-main/) y la carpeta packages/
-   // las wildcards no funcionaron :d
+   // tampoco funciono sacarlas
     snprintf(cmd, sizeof(cmd),
-         "tar -xf \"%s\" -C \"%s\" --strip-components=2 \"*/packages/*\"",
+         "tar -xf \"%s\" -C \"%s\" --strip-components=2 --wildcards '*/packages/*'",
          tmp_archive, target_dir);
     
     int status = system(cmd);
