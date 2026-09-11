@@ -1,6 +1,8 @@
-NAME=coreutils
-VERSION=9.5
-URL=https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz
-SOURCE_TYPE=autotools
-DEPS=gmp
-BUILD_STEPS=./configure --prefix=/usr --enable-no-install-program=kill,uptime && make -j$(nproc) && make DESTDIR=$DESTDIR install
+NAME="coreutils"
+VERSION="9.5"
+SOURCE_URL="https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz"
+DESCRIPTION="GNU core utilities (ls, cp, mv, etc)"
+DEPENDENCIES=""
+BUILD_STEPS="./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR="$DESTDIR" install"

@@ -1,6 +1,7 @@
 NAME="build-essentials"
-VERSION="1.0"
-TYPE="meta"
-URL="none"
-DESCRIPTION="Metapaquete de herramientas de compilación"
-DEPS=["gcc", "make", "binutils"]
+VERSION="1.0.0"
+SOURCE_URL=""
+DESCRIPTION="Essential tools for compiling software"
+DEPENDENCIES="gcc make"
+BUILD_STEPS="mkdir -p "$DESTDIR/usr/share/doc/build-essentials"
+echo "Meta-package build-essentials v1.0.0 installed" > "$DESTDIR/usr/share/doc/build-essentials/README""

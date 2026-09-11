@@ -1,7 +1,7 @@
 NAME="base"
-VERSION="rolling"
-DEPS="glibc busybox systemd linux linux-firmware util-linux e2fsprogs kmod shadow iproute2 fortune"
-BUILD_STEPS="
-    mkdir -p \$DESTDIR/etc
-    echo 'Clover Linux Base System' > \$DESTDIR/etc/clover-release
-"
+VERSION="1.0.0"
+SOURCE_URL=""
+DESCRIPTION="Clover Linux Base System metapackage"
+DEPENDENCIES="bash coreutils busybox"
+BUILD_STEPS="mkdir -p "$DESTDIR/usr/share/doc/base"
+echo "Meta-package base v1.0.0 installed" > "$DESTDIR/usr/share/doc/base/README""

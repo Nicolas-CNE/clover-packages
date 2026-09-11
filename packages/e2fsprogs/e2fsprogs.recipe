@@ -1,5 +1,8 @@
-NAME=e2fsprogs
-VERSION=1.47.0
-URL=https://mirrors.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.47.0/e2fsprogs-1.47.0.tar.gz
-SOURCE_TYPE=autotools
-BUILD_STEPS=CFLAGS="-O2 -std=gnu11" ./configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs && make -j$(nproc) && make DESTDIR="$DESTDIR" install install-libs
+NAME="e2fsprogs"
+VERSION="1.47.0"
+SOURCE_URL="https://kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.47.0/e2fsprogs-1.47.0.tar.gz"
+DESCRIPTION="Ext2/3/4 filesystem utilities"
+DEPENDENCIES=""
+BUILD_STEPS="./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR="$DESTDIR" install"
