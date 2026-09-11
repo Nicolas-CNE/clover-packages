@@ -14,6 +14,22 @@
 
 #define LOCK_FILE "/var/lib/fortune/fortune.lock"
 
+static bool is_system_root_dir(const char *path) {
+    const char *protected_dirs[] = {
+        "/", "/bin", "/sbin", "/etc", "/lib", "/lib64", "/usr", 
+        "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/lib64", 
+        "/usr/include", "/usr/share", "/usr/share/man", "/var",
+        "/var/lib", "/opt", NULL
+    };
+
+    for (int i = 0; protected_dirs[i] != NULL; i++) {
+        if (strcmp(path, protected_dirs[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool is_valid_pkg_name(const char *name) {
     if (!name || strlen(name) == 0 || strlen(name) > 128) return false;
     for (int i = 0; name[i]; i++) {
@@ -107,9 +123,15 @@ int db_register_package(const PackageRecord *pkg) {
 }
 
 bool is_safe_path(const char *path) {
+    // Si la ruta es exactamente un directorio raíz de sistema, no es segura para borrar
+    if (is_system_root_dir(path)) {
+        return false;
+    }
+
+    // Prefijos seguros donde los paquetes suelen instalar archivos
     const char *safe_prefixes[] = {
-        "/usr/bin/", "/usr/share/", "/usr/local/",
-        "/usr/lib/", "/opt/", "/var/lib/fortune/"
+        "/bin/", "/sbin/", "/lib/", "/lib64/",
+        "/usr/", "/opt/", "/etc/", "/var/lib/fortune/"
     };
     int num_prefixes = (int)(sizeof(safe_prefixes) / sizeof(safe_prefixes[0]));
 
@@ -129,16 +151,37 @@ int db_unregister_package(const char *pkg_name) {
 
     printf("[FortunePM] Desinstalando %s...\n", pkg->name);
 
+    // PASE 1: Eliminar solo ARCHIVOS Y SYMLINKS
     for (int i = 0; i < pkg->file_count; i++) {
-        if (pkg->files[i] && pkg->files[i][0] == '/') {
-            if (is_safe_path(pkg->files[i])) {
-                if (unlink(pkg->files[i]) == 0) {
-                    printf("  Borrado: %s\n", pkg->files[i]);
-                } else if (errno != ENOENT) {
-                    perror("  Error al borrar");
+        const char *file_path = pkg->files[i];
+        if (file_path && file_path[0] == '/') {
+            if (is_safe_path(file_path)) {
+                struct stat st;
+                if (lstat(file_path, &st) == 0) {
+                    if (S_ISDIR(st.st_mode)) {
+                        // Ignorar directorios en el primer pase
+                        continue;
+                    }
+                    if (unlink(file_path) == 0) {
+                        printf("  Borrado: %s\n", file_path);
+                    } else if (errno != ENOENT) {
+                        perror("  Error al borrar");
+                    }
                 }
             } else {
-                printf("  [ALERTA DE SEGURIDAD] Se bloqueó el borrado de la ruta protegida: %s\n", pkg->files[i]);
+                printf("  [ALERTA DE SEGURIDAD] Se bloqueó el borrado de la ruta protegida: %s\n", file_path);
+            }
+        }
+    }
+
+    // PASE 2: Limpiar DIRECTORIOS vacíos (recorriendo de atrás hacia adelante)
+    for (int i = pkg->file_count - 1; i >= 0; i--) {
+        const char *file_path = pkg->files[i];
+        if (file_path && file_path[0] == '/' && !is_system_root_dir(file_path)) {
+            struct stat st;
+            if (lstat(file_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                // rmdir solo tendrá éxito si el directorio quedó completamente vacío
+                rmdir(file_path);
             }
         }
     }
@@ -169,16 +212,17 @@ PackageRecord *db_get_package(const char *pkg_name) {
     bool in_files = false;
     int file_idx = 0;
 
-    while (fgets(line, sizeof(line), f)) {
+while (fgets(line, sizeof(line), f)) {
         line[strcspn(line, "\r\n")] = 0;
+
         if (strncmp(line, "NAME=", 5) == 0) {
-            strncpy(pkg->name, line + 5, sizeof(pkg->name) - 1);
+            snprintf(pkg->name, sizeof(pkg->name), "%s", line + 5);
         } else if (strncmp(line, "VERSION=", 8) == 0) {
-            strncpy(pkg->version, line + 8, sizeof(pkg->version) - 1);
+            snprintf(pkg->version, sizeof(pkg->version), "%s", line + 8);
         } else if (strncmp(line, "DESCRIPTION=", 12) == 0) {
-            strncpy(pkg->description, line + 12, sizeof(pkg->description) - 1);
+            snprintf(pkg->description, sizeof(pkg->description), "%s", line + 12);
         } else if (strncmp(line, "INSTALL_DATE=", 13) == 0) {
-            strncpy(pkg->install_date, line + 13, sizeof(pkg->install_date) - 1);
+            snprintf(pkg->install_date, sizeof(pkg->install_date), "%s", line + 13);
         } else if (strncmp(line, "FILES_COUNT=", 12) == 0) {
             pkg->file_count = atoi(line + 12);
             if (pkg->file_count > 0 && pkg->file_count < 100000) {

@@ -3,14 +3,14 @@
 #include "sync.h"
 
 int fortune_sync(void) {
-    printf("[INFO] Sincronizando repositorio de recetas...\n");
+    printf("[INFO] Sincronizando repositorio de recetas desde %s...\n", RECIPES_REPO_URL);
 
     char cmd[512];
     snprintf(cmd, sizeof(cmd),
         "mkdir -p /tmp/fortune_sync && "
-        "curl -sL \"%s\" -o /tmp/fortune_sync/recipes.tar.gz && "
+        "curl -fsSL \"%s\" -o /tmp/fortune_sync/recipes.tar.gz && "
         "mkdir -p %s && "
-        "tar -xf /tmp/fortune_sync/recipes.tar.gz -C %s --strip-components=1 && "
+        "tar -xzf /tmp/fortune_sync/recipes.tar.gz -C %s --strip-components=1 && "
         "rm -rf /tmp/fortune_sync",
         RECIPES_REPO_URL, RECIPES_DIR, RECIPES_DIR);
 
@@ -19,7 +19,9 @@ int fortune_sync(void) {
         printf("[INFO] Base de recetas actualizada correctamente en %s.\n", RECIPES_DIR);
         return 0;
     } else {
-        fprintf(stderr, "[ERROR] Falló la sincronización de recetas.\n");
+        // Limpieza por si quedó la carpeta temporal ante un fallo
+        system("rm -rf /tmp/fortune_sync");
+        fprintf(stderr, "[ERROR] Falló la descarga o extracción del repositorio de recetas.\n");
         return 1;
     }
 }

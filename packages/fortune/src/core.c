@@ -71,7 +71,7 @@ static int execute_recipe_build(const Recipe *r, const char *work_dir, const cha
         return 0;
     }
 
-    if (r->build_steps && strlen(r->build_steps) > 0) {
+    if (strlen(r->build_steps) > 0) {
         snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && sh -c '%s'", fakeroot, r->build_steps);
         return run_command(cmd);
     }
@@ -91,35 +91,45 @@ static int execute_recipe_build(const Recipe *r, const char *work_dir, const cha
 }
 
 static PackageRecord *current_rec_scan = NULL;
+static const char *current_fakeroot_prefix = NULL;
 
 static int scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
-    (void)sb; (void)typeflag; (void)ftwbuf;
-    if (typeflag == FTW_F || typeflag == FTW_SL) {
-        const char *rel_path = fpath;
-        if (strncmp(rel_path, current_rec_scan->files[0], strlen(current_rec_scan->files[0])) == 0) {
-            rel_path += strlen(current_rec_scan->files[0]);
-        }
-        if (strlen(rel_path) > 0) {
-            current_rec_scan->files = realloc(current_rec_scan->files, sizeof(char *) * (current_rec_scan->file_count + 1));
-            current_rec_scan->files[current_rec_scan->file_count] = strdup(rel_path);
-            current_rec_scan->file_count++;
-        }
+    (void)sb; (void)typeflag;
+
+    if (ftwbuf->level == 0) {
+        return 0;
     }
+
+    const char *rel_path = fpath;
+
+if (current_fakeroot_prefix != NULL && strncmp(fpath, current_fakeroot_prefix, strlen(current_fakeroot_prefix)) == 0) {
+        rel_path += strlen(current_fakeroot_prefix);
+    }
+
+    if (strlen(rel_path) == 0) {
+        rel_path = "/";
+    }
+
+    char **tmp = realloc(current_rec_scan->files, sizeof(char *) * (current_rec_scan->file_count + 1));
+    if (!tmp) {
+        return -1;
+    }
+
+    current_rec_scan->files = tmp;
+    current_rec_scan->files[current_rec_scan->file_count] = strdup(rel_path);
+    current_rec_scan->file_count++;
+
     return 0;
 }
 
 static void scan_and_populate_files(const char *fakeroot_path, PackageRecord *rec) {
-    rec->files = malloc(sizeof(char *));
-    rec->files[0] = strdup(fakeroot_path);
+    rec->files = NULL;
     rec->file_count = 0;
 
     current_rec_scan = rec;
-    nftw(fakeroot_path, scan_callback, 20, FTW_PHYS);
+    current_fakeroot_prefix = fakeroot_path;
 
-    free(rec->files[0]);
-    for (int i = 0; i < rec->file_count; i++) {
-        rec->files[i] = rec->files[i+1];
-    }
+    nftw(fakeroot_path, scan_callback, 20, FTW_PHYS);
 }
 
 static void core_install_single(Recipe *r) {

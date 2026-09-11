@@ -1,18 +1,15 @@
-# Variables
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -O2 -Wall -Wextra -Isrc
 LIBS = -lcurl
+SRC = $(wildcard src/*.c)
 TARGET = fortune
-SRC = src/fortune.c
 
-# Compilation
-all:
-	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(LIBS)
+all: $(TARGET)
 
-# Install (requires sudo or root)
-install:
-	cp $(TARGET) /usr/bin/$(TARGET)
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LIBS)
 
-# clean compiled files
 clean:
 	rm -f $(TARGET)
+
+.PHONY: all clean
