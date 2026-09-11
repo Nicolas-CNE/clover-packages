@@ -1,3 +1,7 @@
 NAME="base"
 VERSION="rolling"
 DEPS="glibc busybox systemd linux linux-firmware util-linux e2fsprogs kmod shadow iproute2 fortune"
+BUILD_STEPS="
+    mkdir -p \$DESTDIR/etc
+    echo 'Clover Linux Base System' > \$DESTDIR/etc/clover-release
+"
