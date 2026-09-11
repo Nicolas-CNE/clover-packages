@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "sync.h"
+#include "packsync.h"
+
+// En el handler del comando sync:
+const char *repo = "https://github.com/Nicolas-CNE/clover-packages/archive/refs/heads/main.tar.gz";
+const char *db_path = "/var/lib/fortune/recipes";
+
+fortune_sync_repository(repo, db_path);
 
 int fortune_sync(void) {
     printf("[INFO] Sincronizando repositorio de recetas desde %s...\n", RECIPES_REPO_URL);
