@@ -269,9 +269,9 @@ static void core_install_single(Recipe *r) {
 
 void core_install(const char *pkg_name, int verbose) {
     // 1. Verificar permisos de root antes de proceder
-    if (!core_verify_privileges()) {
-        fprintf(stderr, "\033[31m[ERROR]\033[0m Se requieren permisos de superusuario (root) para instalar.\n");
-        return;
+    if (core_verify_privileges() != 0) {
+    fprintf(stderr, "\033[31m[ERROR]\033[0m Se requieren permisos de superusuario (root) para instalar.\n");
+    return;
     }
 
     // 2. Inicializar el grafo de dependencias
