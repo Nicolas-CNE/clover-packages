@@ -7,10 +7,9 @@
 
 // Helper para limpiar espacios al inicio y final
 static char *trim_whitespace(char *str) {
-    char *end;
     while (isspace((unsigned char)*str)) str++;
     if (*str == 0) return str;
-    end = str + strlen(str) - 1;
+    char *end = str + strlen(str) - 1;
     while (end > str && isspace((unsigned char)*end)) end--;
     end[1] = '\0';
     return str;
@@ -25,17 +24,29 @@ static void strip_quotes(char *str) {
     }
 }
 
+// Reemplazo iterativo de $VAR y ${VAR}
 static void replace_var(char *str, size_t max_len, const char *var_name, const char *value) {
-    char buffer[1024];
-    char placeholder[64];
-    snprintf(placeholder, sizeof(placeholder), "${%s}", var_name);
+    if (!str || !var_name || !value) return;
 
-    char *pos = strstr(str, placeholder);
-    if (pos) {
-        size_t prefix_len = pos - str;
-        snprintf(buffer, sizeof(buffer), "%.*s%s%s", (int)prefix_len, str, value, pos + strlen(placeholder));
-        strncpy(str, buffer, max_len - 1);
-        str[max_len - 1] = '\0';
+    char buffer[2048];
+    char ph_braced[128];
+    char ph_unbraced[128];
+
+    snprintf(ph_braced, sizeof(ph_braced), "${%s}", var_name);
+    snprintf(ph_unbraced, sizeof(ph_unbraced), "$%s", var_name);
+
+    const char *placeholders[2] = { ph_braced, ph_unbraced };
+
+    for (int i = 0; i < 2; i++) {
+        char *pos;
+        while ((pos = strstr(str, placeholders[i])) != NULL) {
+            size_t prefix_len = pos - str;
+            size_t ph_len = strlen(placeholders[i]);
+
+            snprintf(buffer, sizeof(buffer), "%.*s%s%s", (int)prefix_len, str, value, pos + ph_len);
+            strncpy(str, buffer, max_len - 1);
+            str[max_len - 1] = '\0';
+        }
     }
 }
 
@@ -62,16 +73,25 @@ Recipe *parser_parse_recipe(const char *filepath) {
         // Si estamos acumulando las líneas de BUILD_STEPS multilínea
         if (reading_build_steps) {
             char *trimmed = trim_whitespace(line);
-            if (strcmp(trimmed, "\"") == 0 || trimmed[strlen(trimmed) - 1] == '"') {
-                // Si encontramos la comilla de cierre
-                if (trimmed[strlen(trimmed) - 1] == '"' && strcmp(trimmed, "\"") != 0) {
-                    trimmed[strlen(trimmed) - 1] = '\0';
-                    strncat(recipe->build_steps, "\n", sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
-                    strncat(recipe->build_steps, trimmed, sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
-                }
+
+            // Cierre explícito mediante una comilla solitaria
+            if (strcmp(trimmed, "\"") == 0) {
+                reading_build_steps = 0;
+                continue;
+            }
+
+            // Acumular comando con salto de línea
+            if (recipe->build_steps[0] != '\0') {
+                strncat(recipe->build_steps, "\n", sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
+            }
+            
+            // Si la línea finaliza el bloque terminando en "
+            size_t tlen = strlen(trimmed);
+            if (tlen > 0 && trimmed[tlen - 1] == '"' && (tlen == 1 || trimmed[tlen - 2] != '\\')) {
+                trimmed[tlen - 1] = '\0';
+                strncat(recipe->build_steps, trimmed, sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
                 reading_build_steps = 0;
             } else {
-                strncat(recipe->build_steps, "\n", sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
                 strncat(recipe->build_steps, line, sizeof(recipe->build_steps) - strlen(recipe->build_steps) - 1);
             }
             continue;
@@ -104,9 +124,18 @@ Recipe *parser_parse_recipe(const char *filepath) {
             strip_quotes(recipe->installed_size);
         } else if (strncmp(trimmed, "BUILD_STEPS=", 12) == 0) {
             const char *val = trimmed + 12;
-            if (val[0] == '"') val++; // Saltear comilla de apertura
-            snprintf(recipe->build_steps, sizeof(recipe->build_steps), "%s", val);
-            reading_build_steps = 1;
+            char *val_trimmed = strdup(val);
+            if (val_trimmed) {
+                strip_quotes(val_trimmed);
+                snprintf(recipe->build_steps, sizeof(recipe->build_steps), "%s", val_trimmed);
+                free(val_trimmed);
+            }
+
+            // Solo activa multilínea si empieza con comilla y NO termina en comilla en la misma línea
+            size_t len = strlen(trimmed);
+            if (val[0] == '"' && (len == 13 || trimmed[len - 1] != '"' || (len > 13 && trimmed[len - 2] == '\\'))) {
+                reading_build_steps = 1;
+            }
         } else if (strncmp(trimmed, "DEPENDENCIES=", 13) == 0 || strncmp(trimmed, "DEPS=", 5) == 0) {
             const char *deps_start = (trimmed[0] == 'D' && trimmed[1] == 'E' && trimmed[2] == 'P' && trimmed[3] == 'S') ? trimmed + 5 : trimmed + 13;
             char *deps_str = strdup(deps_start);
@@ -128,9 +157,12 @@ Recipe *parser_parse_recipe(const char *filepath) {
 
     fclose(fp);
 
+    // Expansión universal de $NAME, ${NAME}, $VERSION, ${VERSION}
     replace_var(recipe->source_url, sizeof(recipe->source_url), "NAME", recipe->name);
     replace_var(recipe->source_url, sizeof(recipe->source_url), "VERSION", recipe->version);
     replace_var(recipe->git_url, sizeof(recipe->git_url), "NAME", recipe->name);
+    replace_var(recipe->git_url, sizeof(recipe->git_url), "VERSION", recipe->version);
+    replace_var(recipe->branch_tag, sizeof(recipe->branch_tag), "VERSION", recipe->version);
 
     return recipe;
 }
