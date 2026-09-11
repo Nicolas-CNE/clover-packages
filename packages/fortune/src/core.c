@@ -62,53 +62,100 @@ static void resolve_work_directory(const char *base_build, const Recipe *r, char
     snprintf(target_dir, target_size, "%s", base_build);
 }
 
+// Entra al directorio de trabajo o a la carpeta extraída del tarball
+static int enter_build_directory(const char *work_dir) {
+    if (chdir(work_dir) != 0) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo acceder a: %s\n", work_dir);
+        return -1;
+    }
+
+    DIR *d = opendir(".");
+    if (!d) return 0;
+
+    struct dirent *dir;
+    char single_subdir[512] = {0};
+    int count = 0;
+
+    while ((dir = readdir(d)) != NULL) {
+        if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0)
+            continue;
+
+        if (dir->d_type == DT_DIR) {
+            count++;
+            snprintf(single_subdir, sizeof(single_subdir), "%s", dir->d_name);
+        }
+    }
+    closedir(d);
+
+    // Si hay una sola carpeta adentro (ej: zlib-1.3.1/), entra en ella
+    if (count == 1 && strlen(single_subdir) > 0) {
+        if (chdir(single_subdir) != 0) {
+            fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo entrar a: %s\n", single_subdir);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 static int execute_recipe_build(const Recipe *r, const char *work_dir, const char *fakeroot) {
-    (void)work_dir;
     char cmd[4096];
 
+    // Salta paquetes vacíos o metapaquetes
     if (strcmp(r->source_type, "meta") == 0 || strcmp(r->source_type, "none") == 0) {
-        printf("\033[34m[INFO]\033[0m Paquete meta/vacío detectado. Omitiendo fase de compilación.\n");
+        printf("\033[34m[INFO]\033[0m Paquete meta/vacío detectado. Omitiendo compilación.\n");
         return 0;
     }
 
-    if (strlen(r->build_steps) > 0) {
-        // Crear un script shell temporal para ejecutar BUILD_STEPS de forma limpia
+    // Cambia al directorio del código fuente
+    if (enter_build_directory(work_dir) != 0) {
+        return -1;
+    }
+
+    // Ejecuta BUILD_STEPS si la receta los define
+    if (r->build_steps && strlen(r->build_steps) > 0) {
         char script_path[512];
         snprintf(script_path, sizeof(script_path), "%s/../fortune_build.sh", fakeroot);
 
         FILE *f = fopen(script_path, "w");
         if (!f) {
-            fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo crear el script temporal de compilación.\n");
+            fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo crear el script de compilación.\n");
             return -1;
         }
 
-        // Encabezado seguro con 'set -e' para abortar si falla un comando
+        // set -e para frenar el script si falla un comando
         fprintf(f, "#!/bin/sh\nset -e\n%s\n", r->build_steps);
         fclose(f);
 
-        // Dar permisos de ejecución
         chmod(script_path, 0755);
 
-        // Ejecutar el script exportando DESTDIR
-        snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && %s", fakeroot, script_path);
+        // Exporta DESTDIR y corre el script desde la carpeta fuente
+        snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && \"%s\"", fakeroot, script_path);
         int res = run_command(cmd);
 
-        // Limpiar el script
         unlink(script_path);
         return res;
     }
 
+    // Fallback: CMake
     if (strcmp(r->source_type, "cmake") == 0 || access("CMakeLists.txt", F_OK) == 0) {
         snprintf(cmd, sizeof(cmd), "cmake -B build -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build && DESTDIR=\"%s\" cmake --install build", fakeroot);
         return run_command(cmd);
     } 
-    
+
+    // Fallback: Autotools
     if (strcmp(r->source_type, "autotools") == 0 || access("configure", F_OK) == 0) {
         snprintf(cmd, sizeof(cmd), "./configure --prefix=/usr && make -j$(nproc) && make DESTDIR=\"%s\" install", fakeroot);
         return run_command(cmd);
     }
 
-    fprintf(stderr, "\033[31m[ERROR]\033[0m No se reconoció el sistema de compilación ni existen BUILD_STEPS explícitos.\n");
+    // Fallback: Makefile simple
+    if (strcmp(r->source_type, "makefile") == 0 || access("Makefile", F_OK) == 0) {
+        snprintf(cmd, sizeof(cmd), "make -j$(nproc) && make DESTDIR=\"%s\" install", fakeroot);
+        return run_command(cmd);
+    }
+
+    fprintf(stderr, "\033[31m[ERROR]\033[0m Sistema de compilación no reconocido o BUILD_STEPS faltantes.\n");
     return -1;
 }
 
