@@ -72,8 +72,30 @@ static int execute_recipe_build(const Recipe *r, const char *work_dir, const cha
     }
 
     if (strlen(r->build_steps) > 0) {
-        snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && sh -c '%s'", fakeroot, r->build_steps);
-        return run_command(cmd);
+        // Crear un script shell temporal para ejecutar BUILD_STEPS de forma limpia
+        char script_path[512];
+        snprintf(script_path, sizeof(script_path), "%s/../fortune_build.sh", fakeroot);
+
+        FILE *f = fopen(script_path, "w");
+        if (!f) {
+            fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo crear el script temporal de compilación.\n");
+            return -1;
+        }
+
+        // Encabezado seguro con 'set -e' para abortar si falla un comando
+        fprintf(f, "#!/bin/sh\nset -e\n%s\n", r->build_steps);
+        fclose(f);
+
+        // Dar permisos de ejecución
+        chmod(script_path, 0755);
+
+        // Ejecutar el script exportando DESTDIR
+        snprintf(cmd, sizeof(cmd), "export DESTDIR=\"%s\" && %s", fakeroot, script_path);
+        int res = run_command(cmd);
+
+        // Limpiar el script
+        unlink(script_path);
+        return res;
     }
 
     if (strcmp(r->source_type, "cmake") == 0 || access("CMakeLists.txt", F_OK) == 0) {
