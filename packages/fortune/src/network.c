@@ -108,3 +108,29 @@ char *net_fetch_string(const char *url) {
 
     return chunk.data;
 }
+
+// Devuelve el tamaño en bytes del archivo remoto via HTTP HEAD (sin descargar)
+double net_get_remote_file_size(const char *url) {
+    if (!url || strlen(url) == 0 || strcmp(url, "none") == 0) return -1.0;
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return -1.0;
+
+    double filesize = -1.0;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); // Petición HEAD únicamente
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "FortunePM/2.0");
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+
+    if (curl_easy_perform(curl) == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &filesize);
+    }
+
+    curl_easy_cleanup(curl);
+    return filesize;
+}
