@@ -3,6 +3,6 @@ VERSION="32"
 URL="https://kernel.org/pub/linux/utils/kernel/kmod/kmod-32.tar.xz"
 DESCRIPTION="Kernel module utilities"
 DEPENDENCIES=""
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

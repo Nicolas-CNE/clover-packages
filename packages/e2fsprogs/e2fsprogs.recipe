@@ -3,6 +3,6 @@ VERSION="1.47.0"
 URL="https://kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.47.0/e2fsprogs-1.47.0.tar.gz"
 DESCRIPTION="Ext2/3/4 filesystem utilities"
 DEPENDENCIES=""
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

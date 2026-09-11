@@ -3,6 +3,6 @@ VERSION="9.5"
 URL="https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz"
 DESCRIPTION="GNU core utilities"
 DEPENDENCIES=""
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

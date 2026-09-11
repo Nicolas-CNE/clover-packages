@@ -3,6 +3,6 @@ VERSION="124.0.2"
 URL="https://ftp.mozilla.org/pub/firefox/releases/124.0.2/source/firefox-124.0.2.source.tar.xz"
 DESCRIPTION="Mozilla Firefox Web Browser"
 DEPENDENCIES="gtk3 nss"
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

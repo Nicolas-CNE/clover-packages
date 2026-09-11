@@ -3,6 +3,6 @@ VERSION="123.0.6312.105"
 URL="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-123.0.6312.105.tar.xz"
 DESCRIPTION="Chromium Web Browser"
 DEPENDENCIES="gtk3 alsa"
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

@@ -3,9 +3,9 @@ VERSION="3.04"
 URL="https://github.com/tnalpgm/cowsay/archive/refs/tags/cowsay-3.04.tar.gz"
 DESCRIPTION="Configurable speaking cow"
 DEPENDENCIES=""
-BUILD_STEPS="mkdir -p "$DESTDIR/usr/bin"
+BUILD_STEPS='mkdir -p "$DESTDIR/usr/bin"
 if [ -f Makefile ]; then
     make PREFIX="$DESTDIR/usr" install || make DESTDIR="$DESTDIR" install
 else
     cp -f cowsay "$DESTDIR/usr/bin/" 2>/dev/null || true
-fi"
+fi'

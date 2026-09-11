@@ -3,6 +3,6 @@ VERSION="4.4.1"
 URL="https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
 DESCRIPTION="GNU Make build tool"
 DEPENDENCIES=""
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

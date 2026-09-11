@@ -3,6 +3,6 @@ VERSION="5.2.21"
 URL="https://ftp.gnu.org/gnu/bash/bash-5.2.21.tar.gz"
 DESCRIPTION="The GNU Bourne Again Shell"
 DEPENDENCIES=""
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

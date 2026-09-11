@@ -3,6 +3,6 @@ VERSION="2.0"
 URL="https://github.com/abishekvashok/cmatrix/archive/refs/heads/master.tar.gz"
 DESCRIPTION="Matrix terminal effect"
 DEPENDENCIES="ncurses"
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

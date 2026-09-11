@@ -27,35 +27,35 @@ create_recipe() {
 
     case "$build_type" in
         "autotools"|"c")
-            build_steps="./configure --prefix=/usr
-make -j\$(nproc)
-make DESTDIR=\"\$DESTDIR\" install"
+            build_steps='./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR="$DESTDIR" install'
             ;;
         "cmake")
-            build_steps="cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
+            build_steps='cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build
-DESTDIR=\"\$DESTDIR\" cmake --install build"
+DESTDIR="$DESTDIR" cmake --install build'
             ;;
         "meson")
-            build_steps="meson setup build --prefix=/usr
+            build_steps='meson setup build --prefix=/usr
 ninja -C build
-DESTDIR=\"\$DESTDIR\" ninja -C build install"
+DESTDIR="$DESTDIR" ninja -C build install'
             ;;
         "makefile"|"make")
-            build_steps="make -j\$(nproc)
-make DESTDIR=\"\$DESTDIR\" install"
+            build_steps='make -j$(nproc)
+make DESTDIR="$DESTDIR" install'
             ;;
         "meta")
-            build_steps="mkdir -p \"\$DESTDIR/usr/share/doc/$name\"
-echo \"Meta-package $name v$version installed\" > \"\$DESTDIR/usr/share/doc/$name/README\""
+            build_steps='mkdir -p "$DESTDIR/usr/share/doc/'"$name"'"
+echo "Meta-package '"$name"' v'"$version"' installed" > "$DESTDIR/usr/share/doc/'"$name"'/README"'
             ;;
         "script")
-            build_steps="mkdir -p \"\$DESTDIR/usr/bin\"
+            build_steps='mkdir -p "$DESTDIR/usr/bin"
 if [ -f Makefile ]; then
-    make PREFIX=\"\$DESTDIR/usr\" install || make DESTDIR=\"\$DESTDIR\" install
+    make PREFIX="$DESTDIR/usr" install || make DESTDIR="$DESTDIR" install
 else
-    cp -f $name \"\$DESTDIR/usr/bin/\" 2>/dev/null || true
-fi"
+    cp -f '"$name"' "$DESTDIR/usr/bin/" 2>/dev/null || true
+fi'
             ;;
         *)
             build_steps="$build_type"
@@ -68,13 +68,13 @@ VERSION="$version"
 URL="$url"
 DESCRIPTION="$desc"
 DEPENDENCIES="$deps"
-BUILD_STEPS="$build_steps"
+BUILD_STEPS='$build_steps'
 EOF
 
     echo -e "\033[32m[OK]\033[0m Creada receta: \033[1m${recipe_file#$REPO_DIR/}\033[0m"
 }
 
-echo -e "\033[34m[INFO]\033[0m Generando todas las recetas..."
+echo -e "\033[34m[INFO]\033[0m Generando todas las recetas limpias..."
 
 # --- BASE Y SISTEMA ---
 create_recipe "base" "1.0.0" "" "meta" "bash coreutils busybox" "Clover Linux Base System metapackage"
@@ -98,9 +98,9 @@ create_recipe "firefox" "124.0.2" "https://ftp.mozilla.org/pub/firefox/releases/
 create_recipe "chromium" "123.0.6312.105" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-123.0.6312.105.tar.xz" "autotools" "gtk3 alsa" "Chromium Web Browser"
 create_recipe "brave" "1.64.113" "https://github.com/brave/brave-browser/archive/refs/tags/v1.64.113.tar.gz" "script" "gtk3 nss" "Brave Web Browser"
 
-# --- LIBRERÍAS (subcarpeta lib/) ---
+# --- LIBRERÍAS ---
 create_recipe "zlib" "1.3.1" "https://zlib.net/zlib-1.3.1.tar.gz" "autotools" "" "Compression library" "true"
 create_recipe "ncurses" "6.4" "https://ftp.gnu.org/gnu/ncurses/ncurses-6.4.tar.gz" "autotools" "" "Terminal display library" "true"
 create_recipe "openssl" "3.2.1" "https://www.openssl.org/source/openssl-3.2.1.tar.gz" "autotools" "" "TLS/SSL cryptography library" "true"
 
-echo -e "\033[32m[ÉXITO]\033[0m 19 recetas generadas correctamente."
+echo -e "\033[32m[ÉXITO]\033[0m Recetas re-generadas correctamente con sintaxis limpia."

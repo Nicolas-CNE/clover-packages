@@ -3,6 +3,6 @@ VERSION="255"
 URL="https://github.com/systemd/systemd/archive/refs/tags/v255.tar.gz"
 DESCRIPTION="System and Service Manager"
 DEPENDENCIES="dbus coreutils"
-BUILD_STEPS="meson setup build --prefix=/usr
+BUILD_STEPS='meson setup build --prefix=/usr
 ninja -C build
-DESTDIR="$DESTDIR" ninja -C build install"
+DESTDIR="$DESTDIR" ninja -C build install'

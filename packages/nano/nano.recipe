@@ -3,6 +3,6 @@ VERSION="8.0"
 URL="https://github.com/nano-editor/nano/archive/refs/tags/v8.0.tar.gz"
 DESCRIPTION="GNU nano text editor"
 DEPENDENCIES="ncurses"
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'

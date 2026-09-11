@@ -3,6 +3,6 @@ VERSION="13.2.0"
 URL="https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz"
 DESCRIPTION="GNU Compiler Collection"
 DEPENDENCIES="make"
-BUILD_STEPS="./configure --prefix=/usr
+BUILD_STEPS='./configure --prefix=/usr
 make -j$(nproc)
-make DESTDIR="$DESTDIR" install"
+make DESTDIR="$DESTDIR" install'
