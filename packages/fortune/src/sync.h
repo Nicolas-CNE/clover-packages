@@ -5,5 +5,6 @@
 #define RECIPES_REPO_URL "https://github.com/Nicolas-CNE/clover-packages/archive/refs/heads/main.tar.gz"
 
 int fortune_sync(void);
+int cmd_search(const char *query);
 
 #endif
