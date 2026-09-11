@@ -267,7 +267,9 @@ static void core_install_single(Recipe *r) {
     run_command(cmd);
 }
 
-void core_install(const char *pkg_name) {
+void core_install(const char *pkg_name, int verbose) {
+    (void)verbose; // Evita advertencias si todavía no lo usás en esta línea
+
     // 1. Descarga la receta a demanda desde GitHub si no existe en local
     if (fetch_recipe_if_missing(pkg_name, RECIPES_DIR) != 0) {
         fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo obtener la receta para: %s\n", pkg_name);
