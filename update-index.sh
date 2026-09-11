@@ -1,25 +1,27 @@
 #!/bin/sh
-# update-index.sh: Genera PACKINDEX.txt leyendo los .recipe de packages/
-
 OUTPUT="PACKINDEX.txt"
 echo "# Fortune Package Index - Autogenerado" > "$OUTPUT"
 
-for recipe in packages/*/*.recipe; do
+for recipe in packages/*/*.recipe packages/*/*.txt; do
     [ -f "$recipe" ] || continue
     
-    pkgname=""
+    # Ignorar si está dentro de la carpeta de código fuente de fortune
+    case "$recipe" in
+        packages/fortune/*) continue ;;
+    esac
+
+    pkg_name=""
     version=""
     deps=""
     description=""
 
-    # Parsea los campos principales
-    pkgname=$(grep -E '^PKGNAME=' "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    version=$(grep -E '^VERSION=' "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    deps=$(grep -E '^DEPS=' "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    description=$(grep -E '^DESCRIPTION=' "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    pkg_name=$(grep -E "^PKGNAME=" "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    version=$(grep -E "^VERSION=" "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    deps=$(grep -E "^DEPS=" "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    description=$(grep -E "^DESCRIPTION=" "$recipe" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 
-    if [ -n "$pkgname" ]; then
-        echo "${pkgname}|${version}|${deps}|${description}" >> "$OUTPUT"
+    if [ -n "$pkg_name" ]; then
+        echo "$pkg_name|$version|$deps|$description" >> "$OUTPUT"
     fi
 done
 
