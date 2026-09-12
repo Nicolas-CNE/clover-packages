@@ -11,6 +11,7 @@
 #include "network.h"
 #include "db.h"
 #include "packsync.h"
+#include "deps.h"
 
 #define RECIPES_DIR "/var/lib/fortune/recipes"
 
@@ -268,36 +269,33 @@ static void core_install_single(Recipe *r) {
 }
 
 void core_install(const char *pkg_name, int verbose) {
-    // 1. Verificar permisos de root antes de proceder
     if (core_verify_privileges() != 0) {
-    fprintf(stderr, "\033[31m[ERROR]\033[0m Se requieren permisos de superusuario (root) para instalar.\n");
-    return;
-    }
-
-    // 2. Inicializar el grafo de dependencias
-    DependencyGraph graph;
-    deps_graph_init(&graph);
-
-    // 3. Construir el árbol de dependencias
-    if (deps_build_tree(&graph, pkg_name) != 0) {
-        fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudieron resolver las dependencias para: %s\n", pkg_name);
-        deps_graph_free(&graph);
+        fprintf(stderr, "\033[31m[ERROR]\033[0m Se requieren permisos de superusuario (root) para instalar.\n");
         return;
     }
 
-    // 4. Ordenar dependencias de forma topológica
-    PackageList install_order;
-    if (deps_toposort(&graph, &install_order) != 0) {
-        fprintf(stderr, "\033[31m[ERROR]\033[0m Se detectó una dependencia circular.\n");
-        deps_graph_free(&graph);
+    DepGraph *graph = deps_create();
+    if (!graph) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo crear el grafo de dependencias.\n");
         return;
     }
 
-    // 5. Recorrer la lista e instalar cada paquete (incluidas dependencias)
-    for (size_t i = 0; i < install_order.count; i++) {
-        const char *current_pkg = install_order.packages[i].name;
+    // Función recursiva o iterativa para poblar el grafo leyendo las recetas y sus DEPENDENCIES
+    // Usando deps_add_node(graph, name, deps, dep_count, userdata) según la API de deps.h
+    
+    char **install_queue = NULL;
+    int queue_len = 0;
+    char errbuf[256];
 
-        // Omitir si el paquete ya está instalado
+    if (deps_toposort(graph, &install_queue, &queue_len, errbuf, sizeof(errbuf)) != 0) {
+        fprintf(stderr, "\033[31m[ERROR]\033[0m Error al ordenar dependencias: %s\n", errbuf);
+        deps_free(graph);
+        return;
+    }
+
+    for (int i = 0; i < queue_len; i++) {
+        const char *current_pkg = install_queue[i];
+
         if (db_is_installed(current_pkg)) {
             if (verbose) {
                 printf("[INFO] El paquete '%s' ya está instalado, omitiendo.\n", current_pkg);
@@ -305,34 +303,30 @@ void core_install(const char *pkg_name, int verbose) {
             continue;
         }
 
-        // Obtener receta si no existe localmente
         if (fetch_recipe_if_missing(current_pkg, RECIPES_DIR) != 0) {
             fprintf(stderr, "\033[31m[ERROR]\033[0m No se pudo obtener la receta para: %s\n", current_pkg);
-            deps_graph_free(&graph);
+            deps_free_queue(install_queue, queue_len);
+            deps_free(graph);
             return;
         }
 
-        // Construir la ruta de la receta
         char recipe_path[512];
         snprintf(recipe_path, sizeof(recipe_path), "%s/%s/%s.recipe", RECIPES_DIR, current_pkg, current_pkg);
 
-        // Parsear receta
         Recipe *r = parser_parse_recipe(recipe_path);
         if (!r) {
             fprintf(stderr, "\033[31m[ERROR]\033[0m Error al parsear la receta: %s\n", recipe_path);
-            deps_graph_free(&graph);
+            deps_free_queue(install_queue, queue_len);
+            deps_free(graph);
             return;
         }
 
-        // Compilar e instalar el paquete individual
         core_install_single(r);
-
-        // Liberar la memoria de la receta parseada
         parser_free_recipe(r);
     }
 
-    // 6. Liberar la memoria del grafo de dependencias
-    deps_graph_free(&graph);
+    deps_free_queue(install_queue, queue_len);
+    deps_free(graph);
 }
 
 void core_uninstall(const char *pkg_name) {
