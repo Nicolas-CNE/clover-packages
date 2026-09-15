@@ -7,9 +7,7 @@
 
 DepGraph *deps_create(void) {
     DepGraph *graph = calloc(1, sizeof(DepGraph));
-    if (!graph) {
-        return NULL;
-    }
+    if (!graph) return NULL;
 
     graph->capacity = 8;
     graph->nodes = calloc((size_t)graph->capacity, sizeof(DepNode));
@@ -22,9 +20,7 @@ DepGraph *deps_create(void) {
 }
 
 int deps_find_node(const DepGraph *graph, const char *name) {
-    if (!graph || !name) {
-        return -1;
-    }
+    if (!graph || !name) return -1;
 
     for (int i = 0; i < graph->count; i++) {
         if (strcmp(graph->nodes[i].name, name) == 0) {
@@ -36,21 +32,15 @@ int deps_find_node(const DepGraph *graph, const char *name) {
 }
 
 int deps_add_node(DepGraph *graph, const char *name, char **deps, int dep_count, void *userdata) {
-    if (!graph || !name) {
-        return -1;
-    }
+    if (!graph || !name) return -1;
 
     int existing = deps_find_node(graph, name);
-    if (existing >= 0) {
-        return existing;
-    }
+    if (existing >= 0) return existing;
 
     if (graph->count >= graph->capacity) {
         int new_capacity = graph->capacity * 2;
         DepNode *nodes = realloc(graph->nodes, (size_t)new_capacity * sizeof(DepNode));
-        if (!nodes) {
-            return -1;
-        }
+        if (!nodes) return -1;
         graph->nodes = nodes;
         graph->capacity = new_capacity;
     }
@@ -63,19 +53,14 @@ int deps_add_node(DepGraph *graph, const char *name, char **deps, int dep_count,
 
     if (dep_count > 0 && deps) {
         node->deps = calloc((size_t)dep_count, sizeof(char *));
-        if (!node->deps) {
-            return -1;
-        }
+        if (!node->deps) return -1;
 
         for (int i = 0; i < dep_count; i++) {
             node->deps[i] = strdup(deps[i]);
             if (!node->deps[i]) {
-                for (int j = 0; j < i; j++) {
-                    free(node->deps[j]);
-                }
+                for (int j = 0; j < i; j++) free(node->deps[j]);
                 free(node->deps);
                 node->deps = NULL;
-                node->dep_count = 0;
                 return -1;
             }
         }
@@ -87,9 +72,7 @@ int deps_add_node(DepGraph *graph, const char *name, char **deps, int dep_count,
 
 void *deps_get_userdata(const DepGraph *graph, const char *name) {
     int idx = deps_find_node(graph, name);
-    if (idx < 0) {
-        return NULL;
-    }
+    if (idx < 0) return NULL;
     return graph->nodes[idx].userdata;
 }
 
@@ -104,21 +87,18 @@ static int dfs_visit(DepGraph *graph, int idx, char ***queue, int *queue_len, in
         return -1;
     }
 
-    if (node->state == DEPS_VISITED) {
-        return 0;
-    }
+    if (node->state == DEPS_VISITED) return 0;
 
     node->state = DEPS_VISITING;
 
     for (int i = 0; i < node->dep_count; i++) {
-
-     int dep_idx = deps_find_node(graph, node->deps[i]);
-     if (dep_idx < 0) {
-     if (errbuf && errlen > 0) {
-        snprintf(errbuf, errlen, "Dependencia no resuelta '%s' para el paquete '%s'", node->deps[i], node->name);
-     }
-     return -1;
-     }
+        int dep_idx = deps_find_node(graph, node->deps[i]);
+        if (dep_idx < 0) {
+            if (errbuf && errlen > 0) {
+                snprintf(errbuf, errlen, "Dependencia no resuelta '%s' para el paquete '%s'", node->deps[i], node->name);
+            }
+            return -1;
+        }
         if (dfs_visit(graph, dep_idx, queue, queue_len, queue_cap, errbuf, errlen) != 0) {
             return -1;
         }
@@ -129,25 +109,20 @@ static int dfs_visit(DepGraph *graph, int idx, char ***queue, int *queue_len, in
     if (*queue_len >= *queue_cap) {
         int new_cap = (*queue_cap == 0) ? 8 : (*queue_cap * 2);
         char **next = realloc(*queue, (size_t)new_cap * sizeof(char *));
-        if (!next) {
-            return -1;
-        }
+        if (!next) return -1;
         *queue = next;
         *queue_cap = new_cap;
     }
 
-    (*queue)[(*queue_len)++] = strdup(node->name);
-    if (!(*queue)[*queue_len - 1]) {
-        return -1;
-    }
+    (*queue)[*queue_len] = strdup(node->name);
+    if (!(*queue)[*queue_len]) return -1;
+    (*queue_len)++;
 
     return 0;
 }
 
 int deps_toposort(DepGraph *graph, char ***queue, int *queue_len, char *errbuf, size_t errlen) {
-    if (!graph || !queue || !queue_len) {
-        return -1;
-    }
+    if (!graph || !queue || !queue_len) return -1;
 
     for (int i = 0; i < graph->count; i++) {
         graph->nodes[i].state = DEPS_UNVISITED;
@@ -158,9 +133,7 @@ int deps_toposort(DepGraph *graph, char ***queue, int *queue_len, char *errbuf, 
     int cap = 0;
 
     for (int i = 0; i < graph->count; i++) {
-        if (graph->nodes[i].state != DEPS_UNVISITED) {
-            continue;
-        }
+        if (graph->nodes[i].state != DEPS_UNVISITED) continue;
 
         if (dfs_visit(graph, i, &result, &len, &cap, errbuf, errlen) != 0) {
             deps_free_queue(result, len);
@@ -174,27 +147,21 @@ int deps_toposort(DepGraph *graph, char ***queue, int *queue_len, char *errbuf, 
 }
 
 void deps_free_queue(char **queue, int queue_len) {
-    if (!queue) {
-        return;
-    }
+    if (!queue) return;
 
-    for (int i = 0; i < queue_len; i++) {
-        free(queue[i]);
-    }
+    for (int i = 0; i < queue_len; i++) free(queue[i]);
     free(queue);
 }
 
 void deps_free(DepGraph *graph) {
-    if (!graph) {
-        return;
-    }
+    if (!graph) return;
 
     for (int i = 0; i < graph->count; i++) {
         DepNode *node = &graph->nodes[i];
-        for (int j = 0; j < node->dep_count; j++) {
-            free(node->deps[j]);
+        if (node->deps) {
+            for (int j = 0; j < node->dep_count; j++) free(node->deps[j]);
+            free(node->deps);
         }
-        free(node->deps);
     }
 
     free(graph->nodes);
