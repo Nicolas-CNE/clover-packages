@@ -292,7 +292,7 @@ static int populate_dep_graph(DepGraph *graph, const char *pkg_name) {
     Recipe *r = parser_parse_recipe(recipe_path);
     if (!r) return -1;
 
-    deps_add_node(graph, r->name, (const char **)r->dependencies, r->dep_count, NULL);
+ deps_add_node(graph, r->name, (char **)r->dependencies, r->dep_count, NULL);
 
     for (int i = 0; i < r->dep_count; i++) {
         if (populate_dep_graph(graph, r->dependencies[i]) != 0) {
