@@ -29,7 +29,6 @@ int core_verify_privileges(void) {
     return 0;
 }
 
-// Resuelve la ruta relativa real leyendo PACKINDEX.txt o buscando en fallback
 static int resolve_recipe_path(const char *pkg_name, char *out_path, size_t out_size) {
     FILE *f = fopen(RECIPES_DIR "/PACKINDEX.txt", "r");
     if (f) {
@@ -47,7 +46,6 @@ static int resolve_recipe_path(const char *pkg_name, char *out_path, size_t out_
         fclose(f);
     }
 
-    // Fallbacks
     snprintf(out_path, out_size, "%s/%s/%s.recipe", RECIPES_DIR, pkg_name, pkg_name);
     if (access(out_path, F_OK) == 0) return 0;
 
@@ -109,7 +107,8 @@ static int enter_build_directory(const char *work_dir) {
         if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0)
             continue;
 
-        if (dir->d_type == DT_DIR) {
+        struct stat st;
+        if (stat(dir->d_name, &st) == 0 && S_ISDIR(st.st_mode)) {
             count++;
             snprintf(single_subdir, sizeof(single_subdir), "%s", dir->d_name);
         }
@@ -236,12 +235,12 @@ static void core_install_single(Recipe *r) {
     } else if (strlen(r->source_url) > 0 && strcmp(r->source_url, "none") != 0) {
         printf("\033[34m[INFO]\033[0m Descargando %s...\n", r->source_url);
         if (net_download_file(r->source_url, archive) != 0) return;
+        
         snprintf(cmd, sizeof(cmd), "tar -xf %s -C %s --strip-components=1 2>/dev/null || tar -xf %s -C %s", archive, build_dir, archive, build_dir);
         run_command(cmd);
     }
 
     resolve_work_directory(build_dir, r, actual_work_dir, sizeof(actual_work_dir));
-    chdir(actual_work_dir);
 
     printf("\033[34m[INFO]\033[0m Compilando %s en %s...\n", r->name, actual_work_dir);
     int install_res = execute_recipe_build(r, actual_work_dir, fakeroot);
@@ -292,7 +291,7 @@ static int populate_dep_graph(DepGraph *graph, const char *pkg_name) {
     Recipe *r = parser_parse_recipe(recipe_path);
     if (!r) return -1;
 
- deps_add_node(graph, r->name, (char **)r->dependencies, r->dep_count, NULL);
+    deps_add_node(graph, r->name, (char **)r->dependencies, r->dep_count, NULL);
 
     for (int i = 0; i < r->dep_count; i++) {
         if (populate_dep_graph(graph, r->dependencies[i]) != 0) {
